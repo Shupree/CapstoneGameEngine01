@@ -27,7 +27,7 @@ public class TouchPrompt : MonoBehaviour
         if (loadingGauge != null && loadingGauge.activeSelf)
             return;
 
-        // 씬 변경
+        // 씬 전환 신호 발송
         if (Input.GetMouseButtonDown(0))
             MenuManager.Instance.NextScene();
     }
