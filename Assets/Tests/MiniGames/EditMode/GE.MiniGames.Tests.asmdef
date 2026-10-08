@@ -1,0 +1,7 @@
+{
+  "name": "GE.MiniGames.Tests",
+  "rootNamespace": "GE.MiniGames.Tests",
+  "references": ["GE.MiniGames", "Unity.InputSystem", "Unity.TextMeshPro", "UnityEngine.UI"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

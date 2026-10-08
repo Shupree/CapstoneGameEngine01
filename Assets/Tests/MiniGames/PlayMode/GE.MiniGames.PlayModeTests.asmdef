@@ -1,0 +1,12 @@
+{
+  "name": "GE.MiniGames.PlayModeTests",
+  "rootNamespace": "GE.MiniGames.PlayModeTests",
+  "references": [
+    "GE.MiniGames",
+    "Unity.InputSystem",
+    "Unity.InputSystem.TestFramework",
+    "Unity.TextMeshPro",
+    "UnityEngine.UI"
+  ],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

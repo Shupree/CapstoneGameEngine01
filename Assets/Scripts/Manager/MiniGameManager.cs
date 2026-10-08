@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem; // New Input System 사용
+using GE.MiniGames;
 
 public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
 {
@@ -34,6 +35,9 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
     [SerializeField] private Rect miniGameRect = new Rect(0.15f, 0.15f, 0.7f, 0.7f);
 
     private Camera currentMiniGameCamera;
+    private MiniGameController currentMiniGameController;
+    private System.Action<MiniGameResult> currentResultHandler;
+    private bool currentClearHandled;
 
     protected override void Awake()
     {
@@ -112,7 +116,12 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
 
     private void ResetMiniGamePool()
     {
-        remainingMiniGames = new List<string>(miniGameSceneNames);
+        remainingMiniGames.Clear();
+        foreach (string sceneName in miniGameSceneNames)
+        {
+            if (!string.IsNullOrWhiteSpace(sceneName) && !remainingMiniGames.Contains(sceneName))
+                remainingMiniGames.Add(sceneName);
+        }
     }
 
     // 랜덤 미니게임 씬을 Additive 모드로 로드
@@ -130,8 +139,27 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
             ResetMiniGamePool();
         }
 
-        int randomIndex = Random.Range(0, remainingMiniGames.Count);
+        if (remainingMiniGames.Count == 0)
+        {
+            Debug.LogWarning("[MiniGame] 등록된 미니게임 씬이 없습니다.");
+            return;
+        }
+
+        // 풀이 새로 채워져도 다른 후보가 있으면 방금 끝낸 씬을 연속 선택하지 않습니다.
+        var candidateIndices = new List<int>();
+        for (int i = 0; i < remainingMiniGames.Count; i++)
+        {
+            if (remainingMiniGames[i] != currentLoadedMiniGame) candidateIndices.Add(i);
+        }
+        int randomIndex = candidateIndices.Count > 0
+            ? candidateIndices[Random.Range(0, candidateIndices.Count)]
+            : 0;
         string selectedScene = remainingMiniGames[randomIndex];
+        if (!Application.CanStreamedLevelBeLoaded(selectedScene))
+        {
+            Debug.LogError($"[MiniGame] Build Profiles에 등록되지 않은 씬입니다: {selectedScene}");
+            return;
+        }
         remainingMiniGames.RemoveAt(randomIndex);
 
         StartCoroutine(RoutineLoadMiniGame(selectedScene));
@@ -143,6 +171,8 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
         isLoading = true;
 
         if (isHidingAndPaused) PauseAndHideMiniGame(false);
+        UnbindMiniGameResult(true);
+        currentMiniGameCamera = null;
 
         if (!string.IsNullOrEmpty(currentLoadedMiniGame))
         {
@@ -154,6 +184,7 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
         while (!asyncLoad.isDone) yield return null;
 
         currentLoadedMiniGame = sceneName;
+        currentClearHandled = false;
 
         Scene loadedScene = SceneManager.GetSceneByName(sceneName);
         if (loadedScene.IsValid())
@@ -178,6 +209,50 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
         }
 
         isLoading = false;
+        BindMiniGameResult(loadedScene);
+    }
+
+    private void BindMiniGameResult(Scene scene)
+    {
+        if (!scene.IsValid() || !scene.isLoaded) return;
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            var controller = root.GetComponentInChildren<MiniGameController>(true);
+            if (controller == null) continue;
+
+            currentMiniGameController = controller;
+            currentResultHandler = result => HandleMiniGameCompleted(controller, result);
+            controller.Completed += currentResultHandler;
+            return;
+        }
+        // 아직 공통 컨트롤러가 없는 기존 씬은 OnMiniGameCleared 직접 호출을 유지합니다.
+    }
+
+    private void HandleMiniGameCompleted(MiniGameController source, MiniGameResult result)
+    {
+        if (source == null || source != currentMiniGameController || isLoading || currentClearHandled) return;
+        if (source.gameObject.scene.name != currentLoadedMiniGame) return;
+        if (result.GameId != source.GameId || result.RunId != source.RunId) return;
+        if (result.Outcome != MiniGameOutcome.Success || source.State != MiniGameState.Succeeded) return;
+
+        OnMiniGameCleared();
+    }
+
+    private void UnbindMiniGameResult(bool stopGame)
+    {
+        MiniGameController controller = currentMiniGameController;
+        var handler = currentResultHandler;
+        currentMiniGameController = null;
+        currentResultHandler = null;
+        if (controller == null) return;
+        if (handler != null) controller.Completed -= handler;
+        if (stopGame) controller.StopGame();
+    }
+
+    protected override void OnDestroy()
+    {
+        UnbindMiniGameResult(false);
+        base.OnDestroy();
     }
 
     // 미니게임 완전 종료/언로드 (필요시 사용)
@@ -191,6 +266,8 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
     private IEnumerator RoutineCloseMiniGame()
     {
         isLoading = true;
+        UnbindMiniGameResult(true);
+        currentMiniGameCamera = null;
 
         if (isHidingAndPaused)
         {
@@ -211,8 +288,9 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
     // 미니게임 클리어 시 호출
     public void OnMiniGameCleared()
     {
-        if (isLoading) return;
+        if (isLoading || !IsMiniGameActive || currentClearHandled) return;
 
+        currentClearHandled = true;
         currentClearedCount++;
         Debug.Log($"미니게임 클리어! 현재 클리어 수: {currentClearedCount}/{totalMiniGamesToClear}");
 

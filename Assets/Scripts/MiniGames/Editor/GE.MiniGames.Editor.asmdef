@@ -1,0 +1,5 @@
+{
+  "name": "GE.MiniGames.Editor",
+  "references": ["GE.MiniGames", "Unity.TextMeshPro", "UnityEngine.UI", "Unity.RenderPipelines.Universal.Runtime"],
+  "includePlatforms": ["Editor"]
+}
