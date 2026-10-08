@@ -5,6 +5,7 @@ namespace GE.MiniGames
     public enum MiniGameState { Ready, Playing, Paused, Succeeded, Failed, Stopped }
     public enum MiniGameOutcome { Success, Failure }
 
+    /// <summary>종료 순간의 결과 사본입니다. GameId와 RunId로 다른 씬/이전 재시도의 결과를 구분합니다.</summary>
     public readonly struct MiniGameResult
     {
         public readonly string GameId;
@@ -26,6 +27,7 @@ namespace GE.MiniGames
         }
     }
 
+    /// <summary>외부 진행 시스템의 공통 제어 계약입니다. Completed는 실행당 성공 또는 실패를 한 번 전달합니다.</summary>
     public interface IMiniGame
     {
         MiniGameState State { get; }

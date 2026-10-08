@@ -16,8 +16,8 @@ namespace GE.MiniGames.Snake
     }
 
     /// <summary>
-    /// Grid rules only. The owning game controls time, input, presentation and results.
-    /// Coordinates start at the bottom left; Body[0] is the head.
+    /// 격자 규칙만 처리합니다. 시간·입력·화면·외부 결과 통지는 SnakeGame이 관리합니다.
+    /// 좌표 원점은 왼쪽 아래이며 Body[0]이 머리입니다.
     /// </summary>
     public sealed class SnakeModel
     {
@@ -61,7 +61,7 @@ namespace GE.MiniGames.Snake
             Reset();
         }
 
-        /// <summary>A supplied seed also makes retries reproducible.</summary>
+        /// <summary>시드를 지정하면 재시도 시 같은 사과 배치를 재현할 수 있습니다.</summary>
         public void Reset()
         {
             random = seed.HasValue ? new System.Random(seed.Value) : new System.Random();
@@ -81,8 +81,8 @@ namespace GE.MiniGames.Snake
         }
 
         /// <summary>
-        /// Accept at most one perpendicular turn per movement tick. Repeated/current
-        /// directions never consume that slot, and a quick pair of keys cannot reverse.
+        /// 이동 한 번에 수직 방향 전환을 한 번만 예약합니다. 같은 방향 입력은 예약을 소비하지 않고,
+        /// 짧은 시간에 두 키를 눌러 정반대로 꺾는 것도 차단합니다.
         /// </summary>
         public bool QueueDirection(Vector2Int direction)
         {
@@ -115,7 +115,7 @@ namespace GE.MiniGames.Snake
                 return Finish(SnakeStepResult.HitWall);
 
             bool grows = HasApple && next == Apple;
-            // The tail vacates during an ordinary move and is therefore a legal cell.
+            // 성장하지 않는 이동에서는 꼬리가 동시에 비워지므로, 현재 꼬리 칸으로 이동해도 충돌이 아닙니다.
             int occupiedCount = grows ? body.Count : body.Count - 1;
             for (int i = 0; i < occupiedCount; i++)
             {
@@ -155,8 +155,7 @@ namespace GE.MiniGames.Snake
                 return;
             }
 
-            // Pick a free-cell index, then visit cells once. No rejection loop that
-            // becomes slow (or infinite) as the board fills up.
+            // 빈칸 중 하나를 균등 추첨합니다. 보드가 차더라도 빈칸이 나올 때까지 반복 추첨하지 않습니다.
             int selected = random.Next(freeCount);
             for (int y = 0; y < Height; y++)
             {

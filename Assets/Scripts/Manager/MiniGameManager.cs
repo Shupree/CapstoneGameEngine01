@@ -35,6 +35,7 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
     [SerializeField] private Rect miniGameRect = new Rect(0.15f, 0.15f, 0.7f, 0.7f);
 
     private Camera currentMiniGameCamera;
+    // 추가 연결부: 현재 씬의 결과 구독만 보관하며, 클리어 집계는 기존 OnMiniGameCleared가 담당합니다.
     private MiniGameController currentMiniGameController;
     private System.Action<MiniGameResult> currentResultHandler;
     private bool currentClearHandled;
@@ -88,6 +89,7 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
     }
 
     /// 미니게임 씬의 오브젝트들을 숨기거나 보이게 하고 시간을 정지/재개
+    // 기존 Shift 기능은 전역 시간을 변경합니다. 게임 내부 Tab 정지는 컨트롤러에서 별도로 처리합니다.
     private void PauseAndHideMiniGame(bool pauseAndHide)
     {
         isHidingAndPaused = pauseAndHide;
@@ -212,6 +214,7 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
         BindMiniGameResult(loadedScene);
     }
 
+    // 추가 연결부: MainGame이 로드한 씬에서만 결과를 구독합니다. 단독 테스트 씬은 매니저를 만들지 않습니다.
     private void BindMiniGameResult(Scene scene)
     {
         if (!scene.IsValid() || !scene.isLoaded) return;
@@ -228,8 +231,10 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
         // 아직 공통 컨트롤러가 없는 기존 씬은 OnMiniGameCleared 직접 호출을 유지합니다.
     }
 
+    // 추가 연결부: 성공만 기존 진행 함수로 전달합니다. 실패는 같은 씬에서 로컬 재시도를 기다립니다.
     private void HandleMiniGameCompleted(MiniGameController source, MiniGameResult result)
     {
+        // 이전 씬/재시도의 늦은 결과와 중복 통지로 클리어 수가 잘못 증가하는 것을 차단합니다.
         if (source == null || source != currentMiniGameController || isLoading || currentClearHandled) return;
         if (source.gameObject.scene.name != currentLoadedMiniGame) return;
         if (result.GameId != source.GameId || result.RunId != source.RunId) return;
@@ -238,6 +243,7 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
         OnMiniGameCleared();
     }
 
+    // 씬 언로드 전에 구독을 먼저 해제합니다. StopGame은 로컬 정리만 하고 결과를 다시 보내지 않습니다.
     private void UnbindMiniGameResult(bool stopGame)
     {
         MiniGameController controller = currentMiniGameController;
@@ -285,7 +291,7 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
         Debug.Log("[MiniGame Closed]: 미니게임이 완전 종료되었습니다.");
     }
 
-    // 미니게임 클리어 시 호출
+    // 기존 메인 진행 진입점: 클리어 수 증가와 다음 씬/전체 종료 결정은 이 함수에서만 처리합니다.
     public void OnMiniGameCleared()
     {
         if (isLoading || !IsMiniGameActive || currentClearHandled) return;
@@ -305,6 +311,7 @@ public class MiniGameSceneManager : SingletonMono<MiniGameSceneManager>
         }
     }
 
+    // 기존 전체 목표 달성 처리입니다. 현재는 로그만 출력하며 엔딩 화면 연결은 메인 개발 영역입니다.
     private void OnGameEnding()
     {
         Debug.Log("게임 승리! 엄마 몰래 18개의 미니게임을 모두 클리어했습니다.");

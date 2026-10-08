@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace GE.MiniGames
 {
-    /// <summary>Optional standalone controls/presentation. The host subscribes to Completed independently.</summary>
+    /// <summary>테스트용 시작·결과 화면과 재시도 입력입니다. 메인의 결과 구독은 이 UI와 독립적입니다.</summary>
     [DefaultExecutionOrder(100)]
     public sealed class MiniGameTestUI : MonoBehaviour
     {
@@ -56,6 +56,7 @@ namespace GE.MiniGames
                 Time.frameCount == changedFrame);
         }
 
+        // 결과 이전부터 누른 Space로 즉시 재시도되지 않도록, 키를 놓은 뒤 새로 누른 입력만 허용합니다.
         internal void ProcessSpace(bool held, bool isTransitionFrame = false)
         {
             bool pressed = held && !previousSpace;
@@ -66,6 +67,7 @@ namespace GE.MiniGames
             if (!held) spaceArmed = true;
             if (isTransitionFrame || !spaceArmed || !pressed) return;
             spaceArmed = false;
+            // 재시도는 같은 게임을 초기화합니다. 다음 씬 선택은 메인의 성공 결과 처리에서만 수행합니다.
             game.StartGame();
         }
 
