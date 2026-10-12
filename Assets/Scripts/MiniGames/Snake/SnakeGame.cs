@@ -51,7 +51,8 @@ namespace GE.MiniGames.Snake
             // 프레임당 최대 한 칸만 이동해 일시적인 지연 뒤 여러 칸이 한꺼번에 진행되지 않게 합니다.
             elapsed = Mathf.Min(elapsed - moveInterval, moveInterval);
             SnakeStepResult result = Model.Step();
-            // 규칙 판정을 공통 결과로 변환합니다. 실패·재시도는 로컬 처리, 성공의 다음 씬 전환은 메인 책임입니다.
+            // 실패 Finish는 Completed를 통해 MainGame의 MiniGameManager.OnMiniGameFailed로 연결되어 목숨을 차감합니다.
+            // 목숨이 남으면 기존 Space 재시도를 유지하고, 성공의 다음 씬 전환은 매니저가 담당합니다.
             if (result == SnakeStepResult.Won) Finish(MiniGameOutcome.Success, "사과 목표를 달성했습니다!");
             else if (result == SnakeStepResult.HitWall) Finish(MiniGameOutcome.Failure, "벽에 부딪혔습니다.");
             else if (result == SnakeStepResult.HitBody) Finish(MiniGameOutcome.Failure, "몸에 부딪혔습니다.");

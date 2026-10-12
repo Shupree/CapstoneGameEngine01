@@ -19,6 +19,7 @@ namespace GE.MiniGames
         private bool spaceArmed;
         private bool previousSpace;
         private int changedFrame;
+        private bool useExternalPauseOverlay;
 
         public void Configure(MiniGameController controller, GameObject panel, TMP_Text heading,
             TMP_Text body, TMP_Text hint, string startInstructions)
@@ -29,6 +30,9 @@ namespace GE.MiniGames
 
         public void SetStandaloneControls(bool enabled) { keyboardStartAndRetry = enabled; spaceArmed = false; }
         public void SetOverlaysVisible(bool visible) { showOverlays = visible; Refresh(); }
+
+        // MainGame의 검은 정지 UI와 중복되지 않도록 Paused 화면만 숨깁니다. 시작·실패 화면은 유지합니다.
+        public void SetExternalPauseOverlay(bool enabled) { useExternalPauseOverlay = enabled; Refresh(); }
 
         private void OnEnable()
         {
@@ -75,7 +79,8 @@ namespace GE.MiniGames
         {
             if (game == null || overlay == null) return;
             MiniGameState state = game.State;
-            overlay.SetActive(showOverlays && state != MiniGameState.Playing && state != MiniGameState.Stopped);
+            overlay.SetActive(showOverlays && state != MiniGameState.Playing && state != MiniGameState.Stopped
+                && !(useExternalPauseOverlay && state == MiniGameState.Paused));
             if (title == null || description == null || prompt == null) return;
             switch (state)
             {

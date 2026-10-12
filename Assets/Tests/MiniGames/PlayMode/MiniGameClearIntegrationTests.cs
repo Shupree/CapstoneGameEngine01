@@ -26,7 +26,8 @@ namespace GE.MiniGames.PlayModeTests
         {
             originalTimeScale = Time.timeScale;
             Time.timeScale = 1f;
-            managerType = Type.GetType("MiniGameSceneManager, Assembly-CSharp", true);
+            // 메인 개발자가 변경한 실제 매니저 타입 이름으로 기존 클리어 연결을 검증합니다.
+            managerType = Type.GetType("MiniGameManager, Assembly-CSharp", true);
             frame = typeof(MiniGameController).GetMethod("ProcessFrame", BindingFlags.NonPublic | BindingFlags.Instance);
             buttonsType = frame.GetParameters()[1].ParameterType;
             yield return SceneManager.LoadSceneAsync("MainGame", LoadSceneMode.Single);
@@ -104,10 +105,13 @@ namespace GE.MiniGames.PlayModeTests
         public IEnumerator SnakeFailure_StaysInScene_AndRetrySuccessAdvances()
         {
             int before = Field<int>("currentClearedCount");
+            int livesBefore = Field<int>("currentLives");
             snake.StartGame();
             Frame(0f);
             for (int i = 0; i < 40 && snake.State == MiniGameState.Playing; i++) Frame(0.1f);
             Assert.That(snake.State, Is.EqualTo(MiniGameState.Failed));
+            // 실패는 클리어 수를 늘리지 않으며, 같은 게임 재시도에서도 차감된 목숨을 유지합니다.
+            Assert.That(Field<int>("currentLives"), Is.EqualTo(livesBefore - 1));
             Assert.That(Field<int>("currentClearedCount"), Is.EqualTo(before));
             Assert.That(Field<string>("currentLoadedMiniGame"), Is.EqualTo("MiniGame01"));
             Assert.That(Field<bool>("isLoading"), Is.False);
@@ -117,6 +121,7 @@ namespace GE.MiniGames.PlayModeTests
             DriveSnakeToSuccess();
             yield return WaitFor(() => !Field<bool>("isLoading") && Field<string>("currentLoadedMiniGame") == "MiniGame02");
             Assert.That(Field<int>("currentClearedCount"), Is.EqualTo(before + 1));
+            Assert.That(Field<int>("currentLives"), Is.EqualTo(livesBefore - 1));
         }
 
         [UnityTest]

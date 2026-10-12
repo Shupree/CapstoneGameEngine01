@@ -28,6 +28,8 @@ namespace GE.MiniGames
         public abstract int Target { get; }
         public virtual string StartInstructions => string.Empty;
         public bool KeyboardInputEnabled { get => keyboardInputEnabled; set { keyboardInputEnabled = value; FlushInput(); } }
+        // Additive로 연결된 동안에는 MainGame 매니저가 Tab을 처리해 한 입력으로 두 번 전환되는 것을 막습니다.
+        public bool ExternalPauseControl { get; set; }
         public event Action<MiniGameResult> Completed;
         public event Action<MiniGameState> StateChanged;
         public event Action Changed;
@@ -60,13 +62,13 @@ namespace GE.MiniGames
             return held;
         }
 
-        // 실제 플레이와 테스트가 같은 입력 경로를 사용합니다. 눌림 순간만 감지해 Tab 반복 전환을 막습니다.
+        // 단독 씬에서는 기존 Tab 조작을 사용하고, MainGame에 연결되면 매니저에 정지 입력을 맡깁니다.
         internal void ProcessFrame(float deltaTime, GameButtons held)
         {
             blockedButtons &= held;
             GameButtons pressed = held & ~previousButtons & ~blockedButtons;
             previousButtons = held;
-            if ((pressed & GameButtons.Tab) != 0)
+            if (!ExternalPauseControl && (pressed & GameButtons.Tab) != 0)
             {
                 if (State == MiniGameState.Playing) { PauseGame(); return; }
                 if (State == MiniGameState.Paused) { ResumeGame(); return; }
@@ -129,7 +131,7 @@ namespace GE.MiniGames
             SetState(MiniGameState.Stopped);
         }
 
-        // 성공·실패를 즉시 멈추고 실행당 한 번 알립니다. 메인은 성공만 OnMiniGameCleared로 연결합니다.
+        // 성공·실패를 즉시 멈추고 실행당 한 번 알립니다. 메인은 성공을 클리어 집계, 실패를 목숨 차감에 연결합니다.
         protected void Finish(MiniGameOutcome outcome, string reason)
         {
             if (State != MiniGameState.Playing || resultSent) return;
