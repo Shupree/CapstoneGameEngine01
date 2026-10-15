@@ -1,5 +1,21 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-7724617468685255060
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d841cebe2dcce344cbefe84f11fa78d0, type: 3}
+  m_Name: RetroScreenRendererFeature
+  m_EditorClassIdentifier: Assembly-CSharp::GE.Rendering.RetroScreenRendererFeature
+  m_Active: 1
+  shader: {fileID: 4800000, guid: b1335496e0146f446813125af69a31cf, type: 3}
+  injectionPoint: 600
+  showInSceneView: 0
 --- !u!114 &-461528265448016033
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -47,7 +63,8 @@ MonoBehaviour:
   m_RendererFeatures:
   - {fileID: 7833122117494664109}
   - {fileID: -461528265448016033}
-  m_RendererFeatureMap: ad6b866f10d7b46c5f372be47c5298f9
+  - {fileID: -7724617468685255060}
+  m_RendererFeatureMap: ad6b866f10d7b46c5f372be47c5298f96cfe3cc956a5cc94
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
