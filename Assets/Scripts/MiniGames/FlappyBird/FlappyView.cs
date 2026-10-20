@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace GE.MiniGames.FlappyBird
 {
-    // 정적 이미지의 위치만 게임 모델에 맞춥니다. Animator나 연출용 회전·트윈은 사용하지 않습니다.
+    // 물고기·해초와 반복 배경을 게임 모델의 이동에 맞춥니다. 판정과 시간 진행은 FlappyGame이 담당합니다.
     [DefaultExecutionOrder(100)]
     public sealed class FlappyView : MonoBehaviour
     {
@@ -13,6 +13,10 @@ namespace GE.MiniGames.FlappyBird
         [SerializeField] private Image[] lowerPipes, upperPipes;
         [SerializeField] private Sprite birdSprite;
         [SerializeField] private Sprite pipeSprite;
+        // MiniGame02 씬에 연결된 원본을 사용하며 다른 씬이나 공통 에셋을 런타임에 수정하지 않습니다.
+        [SerializeField] private Sprite[] seaweedSprites;
+        [SerializeField] private RawImage flowingBackground;
+        [SerializeField, Range(0f, 1f)] private float backgroundParallax = 0.35f;
         [SerializeField] private TMP_Text progress, heading, description, hint;
         [SerializeField] private GameObject overlay;
         [SerializeField] private RectTransform progressFill;
@@ -20,7 +24,7 @@ namespace GE.MiniGames.FlappyBird
         private int stateFrame;
         private const float Scale = 60f;
 
-        // 씬 제작 시 한 번 연결하며 팀원 에셋은 Inspector의 두 Sprite 슬롯에서 교체합니다.
+        // 기본 참조는 씬 제작 시 연결하고, 수중 스프라이트와 반복 배경은 씬 Inspector에 저장합니다.
         public void Configure(FlappyGame controller, Image birdImage, Image[] lower, Image[] upper,
             Sprite sprite, TMP_Text counter, RectTransform fill, GameObject panel,
             TMP_Text title, TMP_Text body, TMP_Text prompt)
@@ -63,6 +67,7 @@ namespace GE.MiniGames.FlappyBird
             var model = game.Model;
             if (model != null)
             {
+                RefreshBackground(model);
                 bird.sprite = birdSprite;
                 bird.color = birdSprite == null ? new Color32(255, 215, 75, 255) : Color.white;
                 bird.rectTransform.anchoredPosition = new Vector2(FlappyRules.BirdX, model.BirdY) * Scale;
@@ -71,8 +76,8 @@ namespace GE.MiniGames.FlappyBird
                     var pipe = model.Pipes[i];
                     float bottom = pipe.GapY - model.Rules.gapHeight / 2f;
                     float top = pipe.GapY + model.Rules.gapHeight / 2f;
-                    PlacePipe(lowerPipes[i], pipe.X, (-4.5f + bottom) / 2f, bottom + 4.5f, model.Rules.pipeWidth);
-                    PlacePipe(upperPipes[i], pipe.X, (4.5f + top) / 2f, 4.5f - top, model.Rules.pipeWidth);
+                    PlacePipe(lowerPipes[i], pipe.X, (-4.5f + bottom) / 2f, bottom + 4.5f, model.Rules.pipeWidth, false);
+                    PlacePipe(upperPipes[i], pipe.X, (4.5f + top) / 2f, 4.5f - top, model.Rules.pipeWidth, true);
                 }
             }
             progress.text = $"{game.Progress:00} / {game.Target:00}";
@@ -93,12 +98,47 @@ namespace GE.MiniGames.FlappyBird
             }
         }
 
-        private void PlacePipe(Image image, float x, float y, float height, float width)
+        // 별도 타이머 대신 실제 장애물 이동 거리를 사용합니다. 정지·숨김·결과 화면에서는
+        // 모델이 멈추므로 배경도 고정되고, 새 모델로 재시작하면 스크롤이 처음 위치로 돌아옵니다.
+        private void RefreshBackground(FlappyModel model)
         {
-            image.sprite = pipeSprite;
-            image.color = pipeSprite == null ? new Color32(54, 149, 118, 255) : Color.white;
+            if (flowingBackground == null || flowingBackground.texture == null || model.Pipes.Count == 0) return;
+            Rect viewport = flowingBackground.rectTransform.rect;
+            if (viewport.width <= 0f || viewport.height <= 0f) return;
+            Texture texture = flowingBackground.texture;
+            float tileWidth = viewport.height * texture.width / texture.height;
+            float distance = (model.Rules.firstPipeX - model.Pipes[0].X) * Scale * backgroundParallax;
+            // U 좌표를 증가시키면 무늬가 왼쪽으로 흐릅니다. 원본 비율과 Repeat 샘플링을
+            // 유지하여 화면 크기 변경과 반복 경계에서도 빈틈 없이 연결합니다.
+            flowingBackground.uvRect = new Rect(Mathf.Repeat(distance / tileWidth, 1f), 0f,
+                viewport.width / tileWidth, 1f);
+        }
+
+        // 판정 사각형은 그대로 유지하되 가장 비슷한 종횡비의 해초를 골라 늘어남을 줄입니다.
+        private Sprite SeaweedSprite(float height, float width)
+        {
+            Sprite selected = pipeSprite;
+            float bestDifference = float.PositiveInfinity;
+            if (seaweedSprites == null) return selected;
+            foreach (Sprite sprite in seaweedSprites)
+            {
+                if (sprite == null) continue;
+                float difference = Mathf.Abs(sprite.rect.height / sprite.rect.width - height / width);
+                if (difference >= bestDifference) continue;
+                selected = sprite;
+                bestDifference = difference;
+            }
+            return selected;
+        }
+
+        private void PlacePipe(Image image, float x, float y, float height, float width, bool upper)
+        {
+            image.sprite = SeaweedSprite(height, width);
+            image.color = image.sprite == null ? new Color32(54, 149, 118, 255) : Color.white;
             image.rectTransform.anchoredPosition = new Vector2(x, y) * Scale;
             image.rectTransform.sizeDelta = new Vector2(width, height) * Scale;
+            // 위쪽 해초의 뿌리는 천장에, 잎 끝은 통과 공간을 향하게 합니다.
+            image.rectTransform.localScale = new Vector3(1f, upper ? -1f : 1f, 1f);
         }
     }
 }
