@@ -2086,6 +2086,7 @@ MonoBehaviour:
   miniGameSceneNames:
   - MiniGame01
   - MiniGame02
+  - MiniGame03
   totalMiniGamesToClear: 18
   currentClearedCount: 0
   startingLives: 3
