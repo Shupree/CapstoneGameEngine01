@@ -46,10 +46,11 @@ namespace GE.MiniGames.PlayModeTests
             manager = Object.FindFirstObjectByType(managerType) as MonoBehaviour;
             Assert.That(manager, Is.Not.Null);
             yield return WaitFor(() => !Field<bool>("isLoading") && Field<string>("currentLoadedMiniGame") != string.Empty);
-            // 미완성 MiniGame02가 먼저 선택되면 기존 선택 풀을 통해 MiniGame01로 전환합니다.
+            MainGameTestScenes.UseSnakeAndSecondGame(manager);
+            // 실제 프로젝트의 씬 개수와 관계없이 이 테스트의 대상인 스네이크를 명시적으로 선택합니다.
             if (Field<string>("currentLoadedMiniGame") != "MiniGame01")
             {
-                Call("LoadRandomMiniGame");
+                MainGameTestScenes.Load(manager, "MiniGame01");
                 yield return WaitFor(() => !Field<bool>("isLoading") && Field<string>("currentLoadedMiniGame") == "MiniGame01");
             }
             snake = Object.FindFirstObjectByType<SnakeGame>();
@@ -126,14 +127,17 @@ namespace GE.MiniGames.PlayModeTests
             yield return Keys(Key.Tab);
             var head = snake.Model.Body[0];
             yield return Keys(Key.LeftShift);
-            Assert.That(Field<bool>("isHidingAndPaused"), Is.True);
+            Assert.That(Field<bool>("isMiniGameHidden"), Is.True);
             Assert.That(overlay.gameObject.activeSelf, Is.False);
-            Assert.That(snake.gameObject.activeInHierarchy, Is.False);
+            // Shift는 컨트롤러를 끄지 않고 그리기만 숨겨, Tab 정지 상태를 그대로 유지합니다.
+            Assert.That(snake.gameObject.activeInHierarchy, Is.True);
+            AssertPresentationHidden();
+            Assert.That(Time.timeScale, Is.EqualTo(1f));
             // 닫힌 게임기에 Tab 입력이 들어와도 원래의 정지 상태를 바꾸지 않습니다.
             yield return Keys(Key.LeftShift, Key.Tab);
             Assert.That(snake.State, Is.EqualTo(MiniGameState.Paused));
             yield return Keys();
-            Assert.That(Field<bool>("isHidingAndPaused"), Is.False);
+            Assert.That(Field<bool>("isMiniGameHidden"), Is.False);
             Assert.That(snake.gameObject.activeInHierarchy, Is.True);
             Assert.That(snake.State, Is.EqualTo(MiniGameState.Paused));
             Assert.That(overlay.gameObject.activeInHierarchy, Is.True);
@@ -141,6 +145,39 @@ namespace GE.MiniGames.PlayModeTests
             yield return Keys(Key.Tab);
             Assert.That(snake.State, Is.EqualTo(MiniGameState.Playing));
             Assert.That(overlay.gameObject.activeSelf, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator ShiftAlone_KeepsSnakeAndMainGameRunning_AndPreservesHiddenAcrossSceneSwitch()
+        {
+            var head = snake.Model.Body[0];
+            yield return Keys(Key.LeftShift);
+            AssertPresentationHidden();
+            float hostTime = Time.time;
+            yield return new WaitForSeconds(0.3f);
+            Assert.That(snake.State, Is.EqualTo(MiniGameState.Playing));
+            Assert.That(snake.Model.Body[0], Is.Not.EqualTo(head), "숨기기 전에 Tab을 누르지 않으면 미니게임도 진행됩니다.");
+            Assert.That(Time.time, Is.GreaterThan(hostTime));
+
+            // Shift를 계속 누른 채 다음 씬이 들어와도 새 카메라와 Canvas를 노출하지 않습니다.
+            Call("LoadRandomMiniGame");
+            yield return WaitFor(() => !Field<bool>("isLoading") && Field<string>("currentLoadedMiniGame") == "MiniGame02");
+            Assert.That(Field<bool>("isMiniGameHidden"), Is.True);
+            AssertPresentationHidden();
+            yield return Keys();
+            Assert.That(Field<bool>("isMiniGameHidden"), Is.False);
+            Assert.That(Field<Camera>("currentMiniGameCamera").enabled, Is.True);
+        }
+
+        // 로직의 활성 상태와 별개로 실제 화면 출력 경로가 모두 차단됐는지 검사합니다.
+        private void AssertPresentationHidden()
+        {
+            var scene = SceneManager.GetSceneByName(Field<string>("currentLoadedMiniGame"));
+            foreach (var root in scene.GetRootGameObjects())
+            {
+                foreach (var camera in root.GetComponentsInChildren<Camera>(true)) Assert.That(camera.enabled, Is.False);
+                foreach (var canvas in root.GetComponentsInChildren<Canvas>(true)) Assert.That(canvas.enabled, Is.False);
+            }
         }
 
         [UnityTest]

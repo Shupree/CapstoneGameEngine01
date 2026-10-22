@@ -154,19 +154,20 @@ namespace GE.MiniGames
 
         protected void NotifyChanged() { Changed?.Invoke(); }
 
-        private void FlushInput()
+        private void FlushInput(bool readCurrentInput = true)
         {
             // 전환 중 누른 키는 놓을 때까지 차단하고 첫 틱을 건너뛰어, 재개 직후 입력/시간이 몰리지 않게 합니다.
-            blockedButtons |= previousButtons | ReadButtons();
+            blockedButtons |= previousButtons | (readCurrentInput ? ReadButtons() : GameButtons.None);
             OnClearInput();
             skipNextTick = true;
         }
 
         protected virtual void OnEnable() { FlushInput(); }
-        // 기존 Shift 숨김으로 비활성화되어도 보드와 이동 주기의 남은 시간은 유지합니다.
+        // 씬 언로드/비활성화 중에는 Input System 장치 버퍼가 이미 정리될 수 있어 현재 키를 다시 읽지 않습니다.
+        // 재활성화 시 OnEnable이 그때 누른 키까지 차단합니다. Shift 숨김은 이제 이 콜백을 발생시키지 않습니다.
         protected virtual void OnDisable()
         {
-            FlushInput();
+            FlushInput(false);
             StopAllCoroutines();
             CancelInvoke();
         }

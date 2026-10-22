@@ -16,8 +16,8 @@ public class DoorController : MonoBehaviour
     [SerializeField, Min(0.01f)] private float openDuration = 1.2f;
     [SerializeField, Min(0.01f)] private float closeDuration = 0.8f;
     [SerializeField] private AnimationCurve easing = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
-    [Tooltip("켜면 Time.timeScale의 영향을 받지 않습니다. 현재 Shift 숨김과 게임오버는 전역 timeScale을 0으로 만들기 때문에, " +
-             "끈 상태(기본)에서는 그동안 문도 멈춥니다. MainGame 시간 정책이 바뀌면 함께 정합니다.")]
+    [Tooltip("켜면 Time.timeScale의 영향을 받지 않습니다. 기본값에서는 게임오버 시 문도 멈춥니다. " +
+             "Shift 숨김과 Tab 정지는 전역 시간을 바꾸지 않으므로 문은 계속 움직입니다.")]
     [SerializeField] private bool useUnscaledTime;
     [SerializeField] private bool startOpen;
 

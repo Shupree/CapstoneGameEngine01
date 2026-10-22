@@ -70,6 +70,7 @@ namespace GE.MiniGames.PlayModeTests
             manager = Object.FindFirstObjectByType(managerType) as MonoBehaviour;
             Assert.That(manager, Is.Not.Null);
             yield return WaitFor(() => !Field<bool>("isLoading") && Field<string>("currentLoadedMiniGame") != string.Empty);
+            MainGameTestScenes.UseSnakeAndSecondGame(manager);
             yield return EnsureSnake();
             Assert.That(Field<int>("currentLives"), Is.EqualTo(3));
             Assert.That(Field<bool>("isGameOver"), Is.False);
@@ -229,7 +230,8 @@ namespace GE.MiniGames.PlayModeTests
         {
             if (Field<string>("currentLoadedMiniGame") != "MiniGame01")
             {
-                Call("LoadRandomMiniGame");
+                // 새 미니게임이 등록되어도 목숨 검증의 대상은 이 실행의 스네이크로 고정합니다.
+                MainGameTestScenes.Load(manager, "MiniGame01");
                 yield return WaitFor(() => !Field<bool>("isLoading") && Field<string>("currentLoadedMiniGame") == "MiniGame01");
             }
             snake = Object.FindFirstObjectByType<SnakeGame>();

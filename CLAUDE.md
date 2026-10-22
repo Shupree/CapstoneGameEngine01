@@ -1,6 +1,6 @@
 # Claude 협업 작업 지침
 
-이 문서는 협업자의 Claude가 프로젝트를 수정할 때 지켜야 할 규칙과 기존 시스템의 연결 계약을 정리한다. **2026-10-15에 확인한 코드 기준**이다. 구현이 바뀌면 관련 설명도 함께 갱신한다.
+이 문서는 협업자의 Claude가 프로젝트를 수정할 때 지켜야 할 규칙과 기존 시스템의 연결 계약을 정리한다. **2026-10-22에 확인한 코드 기준**이다. 구현이 바뀌면 관련 설명도 함께 갱신한다.
 
 사용자의 최신 요청과 [AGENTS.md](AGENTS.md)를 먼저 확인한다. 작업 전 현재 코드와 씬의 실제 연결을 읽고, 이전 대화나 과거 문서만으로 구현 상태를 추정하지 않는다.
 
@@ -45,10 +45,10 @@ Lobby
 → Retry? 클릭: MainGame 전체 재생성
 ```
 
-- 기획상 미니게임 목표는 **18개**다. 현재 실제 플레이 가능한 구현은 `Assets/Scenes/MiniGame01.unity`의 스네이크다.
-- `MiniGame02`는 현재 선택 목록과 빌드 설정에 등록된 **미완성 테스트 씬**이다. 두 번째 게임이 완성됐다고 가정하지 않는다.
+- 기획상 미니게임 목표는 **18개**다. 현재 등록된 씬은 `MiniGame01`(스네이크), `MiniGame02`(Flappy), `MiniGame03`(Sorting)이며 각각 공통 컨트롤러가 연결되어 있다.
+- 씬 목록은 계속 늘어날 수 있다. 과거의 두 씬 구성이나 MiniGame02가 빈 테스트 씬이라는 가정을 새 구현·테스트에 사용하지 않는다.
 - 현재 목표 판정은 **누적 18회 클리어**다. 선택 풀이 소진되면 다시 채우므로, 서로 다른 18개를 한 번씩 완료했는지 검사하는 구현은 아니다.
-- `OnGameEnding()`은 현재 승리 로그만 출력한다. 엔딩 화면과 엄마의 실제 행동·발각 판정까지 완성된 것으로 보고하지 않는다.
+- `OnGameEnding()`은 승리 로그와 `GameFinished` 알림을 보낸다. 엔딩 화면은 아직 없으며, 엄마의 문 방문·발각 이벤트는 구현되어 있다.
 - `PageBase.FakeLoad()`는 임시 로딩 표시다. 게임 성공·실패나 게임오버를 판단하는 함수가 아니다.
 
 ## 4. 코드의 책임과 어셈블리 경계
@@ -59,6 +59,11 @@ Lobby
 | `Assets/Scripts/Manager/MiniGameManager.cs` | Additive 씬 관리, 클리어 집계, 목숨, MainGame의 Tab·Shift 입력, 게임오버·전체 재시작. |
 | `Assets/Scripts/Utilities/SingletonMono.cs` | 싱글턴 생성·중복 방지·수명 관리. 상속 클래스의 `Awake`와 `OnDestroy`에서 기존 기본 처리를 보존한다. |
 | `Assets/Scripts/Commons/ComEnum.cs` | `ESceneType`, 확장 가능한 패배 원인 `EGameOverReason`. |
+| `Assets/Scripts/MainGame/MainGameEventDirector.cs` | 이벤트 완료 뒤 30~120초 대기, 등록된 이벤트 선택, 동시 실행 방지, 숨김 상태 기반 공통 발각 판정. 씬 수명에 종속된다. |
+| `Assets/Scripts/MainGame/MainGameEventBase.cs` | 개별 이벤트의 실행·완료·취소·발각 구간 계약. 새로운 이벤트는 이 타입을 상속해 Director 목록에 등록한다. |
+| `Assets/Scripts/MainGame/MotherDoorVisitEvent.cs` | 발걸음 → 문 열기 → 침대 관찰 → 퇴장 → 문 닫기의 순서와 발각 시간. |
+| `Assets/Scripts/MainGame/MotherActorController.cs` | Inspector 이동 지점을 따라 이동·회전하고 기존 Run을 감속한다. 이벤트 주기나 게임오버를 관리하지 않는다. |
+| `Assets/Scripts/MainGame/DoorController.cs` | 기존 경첩 회전과 Open/Close/IsOpen/IsClosed API. 입력과 발각 판정은 외부 책임이다. |
 | `Assets/Scripts/MiniGames/Common` | `IMiniGame`, `MiniGameController`, 결과·상태 계약, 단독 실행용 UI. 변경 시 모든 미니게임에 미칠 영향을 확인한다. |
 | `Assets/Scripts/MiniGames/Snake` | 스네이크 규칙·로컬 실행·화면 표시. 전체 목숨이나 다음 씬을 직접 관리하지 않는다. |
 | `Assets/Scripts/MiniGames/Editor` | Editor 전용 씬 구성·검증 도구. 런타임 코드와 분리한다. |
@@ -102,7 +107,7 @@ Lobby
 | --- | --- |
 | MainGame에서 Tab | `MiniGameManager`가 눌림 순간을 처리하고 컨트롤러의 정지·재개 API를 호출한다. 키를 길게 눌러도 한 번만 전환한다. |
 | Tab 정지 | 미니게임만 멈춘다. `Time.timeScale`을 0으로 만들어 MainGame까지 정지시키지 않는다. |
-| Shift 누름 | 미니게임 루트 오브젝트를 숨긴다. 현재 구현은 전역 `Time.timeScale`도 0으로 만든다. |
+| Shift 누름 | 미니게임의 Camera·Canvas만 숨긴다. 루트·로직·물리·전역 시간은 계속 진행된다. |
 | Shift 해제 | 게임기를 다시 표시한다. 숨기기 전에 Tab으로 정지했다면 정지 상태를 유지한다. |
 | Shift로 숨긴 동안 | Tab으로 정지 상태를 바꾸지 않는다. MainGame에 배치한 정지 오버레이도 함께 숨긴다. |
 | MainGame 게임오버 | 현재 전체 진행을 `Time.timeScale = 0`으로 정지한다. 클릭 UI는 계속 작동해야 한다. |
@@ -113,7 +118,9 @@ Lobby
 - 정지 중 들어온 입력은 재개 시 누적 적용하지 않는다. 기존 `FlushInput()`과 첫 틱 건너뛰기 처리를 보존한다.
 - 매니저의 `[DefaultExecutionOrder(-100)]`은 컨트롤러보다 먼저 입력을 처리하기 위한 것이다. 실행 순서를 바꿀 때는 정지 프레임의 추가 진행 여부도 검사한다.
 
-**현재 제약:** 기획상 게임기를 숨겨도 엄마의 진행은 계속되어야 하지만, 현재 Shift 구현은 전역 시간을 멈춘다. 이 부분이 이미 해결됐다고 가정하지 않는다. 관련 작업을 요청받으면 MainGame의 시간 정책과 함께 수정하고, 개별 미니게임 작업 중에 전역 시간 정책을 조용히 바꾸지 않는다.
+- 숨기기 전에 Tab을 눌러야 숨긴 동안에도 미니게임이 정지한다. Shift만 누르면 보이지 않는 미니게임도 실패할 수 있다.
+- 외부 숨김 조회는 `IsMiniGameHidden`이다. 과거 `IsHidingAndPaused`·`PauseAndHideMiniGame` 이름으로 되돌리지 않는다.
+- 숨김 해제 시 각 Camera·Canvas의 기존 enabled 상태를 복원한다. 새 Additive 씬도 첫 렌더링 전에 숨기고, 로딩 중에도 Shift 상태를 갱신한다.
 
 ## 7. 목숨·게임오버·전체 재시작
 
@@ -123,7 +130,7 @@ Lobby
 - 목숨이 0개면 `TriggerGameOver(EGameOverReason.LivesDepleted)`로 진입한다.
 - 엄마 발각 등 다른 패배 원인도 같은 `TriggerGameOver`를 사용한다. 별도의 게임오버 플래그·화면·재시작 경로를 중복 구현하지 않는다.
 
-메인 어셈블리의 엄마 시스템에서 연결할 호출 예시는 다음과 같다. 이 호출 예시는 엄마의 발각 판정 자체가 구현되어 있다는 뜻은 아니다.
+현재 `MainGameEventDirector`는 활성 이벤트의 발각 구간에 게임기가 보이면 아래 공통 게임오버를 요청한다. Inspector의 매니저 참조를 사용하며 없는 싱글턴을 생성하지 않는다.
 
 ```csharp
 // MainGame에서 엄마에게 발각됐다고 판정한 시점에 공통 게임오버를 요청합니다.
@@ -195,6 +202,7 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 | PlayMode `MiniGameClearIntegrationTests` | MainGame의 클리어 집계·다음 씬·중복/과거 결과 차단 |
 | PlayMode `MiniGamePauseIntegrationTests` | Tab 정지·재개, Shift 숨김과의 조합, 정지 UI 수명 |
 | PlayMode `MiniGameLivesIntegrationTests` | 목숨 차감·로컬 재시도·게임오버·전체 재시작·다른 패배 원인 |
+| PlayMode `MainGameMotherEventIntegrationTests` | 실제 소리 종료·문 시작 기준 시간, 침대 관찰·퇴장, 닫힘 중 발각, Tab 상태의 발각, 재시작·목표 달성 시 이벤트 수명 |
 
 관련 기능을 수정한 경우 다음을 확인한다.
 

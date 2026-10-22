@@ -34,7 +34,11 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     private string currentLoadedMiniGame = string.Empty;            // 현재 로드된 미니게임 씬 이름
     private List<string> remainingMiniGames = new List<string>();   // 아직 로드되지 않은 미니게임 씬 이름 목록
     private bool isLoading = false;
-    private bool isHidingAndPaused = false;
+    private bool isMiniGameHidden;
+    private string loadingMiniGameScene = string.Empty;
+    // 루트를 끄면 로직도 멈추므로, 그리기 컴포넌트만 원래 활성 상태와 함께 보관합니다.
+    private readonly Dictionary<Camera, bool> cameraVisibility = new Dictionary<Camera, bool>();
+    private readonly Dictionary<Canvas, bool> canvasVisibility = new Dictionary<Canvas, bool>();
 
     [Header("MiniGame Pause UI")]
     [Tooltip("MainGame 하이어라키에 배치한 일시정지 Image의 RectTransform입니다. 자식 Text도 함께 표시됩니다.")]
@@ -49,15 +53,18 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     public int CurrentClearedCount => currentClearedCount;
     public int CurrentLives => currentLives;
     public bool IsGameOver => isGameOver;
+    public bool IsGameFinished { get; private set; }
     public EGameOverReason GameOverReason => gameOverReason;
 
     // 목숨 표시나 엄마 시스템은 이 이벤트를 구독할 수 있습니다. UI 오브젝트를 코드로 만들지는 않습니다.
     public event System.Action<int> LivesChanged;
     public event System.Action<EGameOverReason> GameOverTriggered;
+    // 엔딩 화면은 기존 개발 영역에 두고, 목표 달성 시 MainGame 이벤트의 중단만 알립니다.
+    public event System.Action GameFinished;
 
     // 현재 미니게임이 활성화되었는지 여부
     public bool IsMiniGameActive => !string.IsNullOrEmpty(currentLoadedMiniGame);
-    public bool IsHidingAndPaused => isHidingAndPaused;
+    public bool IsMiniGameHidden => isMiniGameHidden;
     public bool IsMiniGamePaused => isMiniGamePaused;
 
     [Header("MiniGame Camera Viewport Settings")]
@@ -75,6 +82,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         // SingletonMono의 Awake()를 호출하여 DontDestroyOnLoad 및 중복 방지 처리
         base.Awake();
         if (Singleton != this) return;
+        SceneManager.sceneLoaded += HandleMiniGameSceneLoaded;
 
         // MainGame을 새로 생성할 때마다 진행도와 목숨을 초기화합니다. 미니게임 로컬 재시도에는 적용하지 않습니다.
         currentClearedCount = 0;
@@ -99,10 +107,10 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         }
 
         // 숨김을 먼저 처리합니다. Shift로 게임기를 닫은 동안에는 Tab 전환을 받지 않습니다.
-        if (IsMiniGameActive && !isLoading && !isGameOver && !isRestarting)
+        if (!isGameOver && !isRestarting && !IsGameFinished)
         {
             HandleShiftHideInput();
-            HandleTabPauseInput();
+            if (IsMiniGameActive && !isLoading) HandleTabPauseInput();
         }
 
         // Inspector에서 바꾼 카메라 영역과 하이어라키의 정지 UI 영역을 함께 맞춥니다.
@@ -112,7 +120,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     // Tab의 눌림 순간만 처리합니다. 키를 계속 누르고 있어도 정지/재개가 반복되지 않습니다.
     private void HandleTabPauseInput()
     {
-        if (Keyboard.current == null || isHidingAndPaused) return;
+        if (Keyboard.current == null || isMiniGameHidden) return;
         if (!Keyboard.current.tabKey.wasPressedThisFrame) return;
         if (currentMiniGameController == null) return;
 
@@ -140,57 +148,70 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         miniGamePauseOverlay.offsetMin = Vector2.zero;
         miniGamePauseOverlay.offsetMax = Vector2.zero;
 
-        bool visible = IsMiniGameActive && !isLoading && isMiniGamePaused && !isHidingAndPaused && !isGameOver;
+        bool visible = IsMiniGameActive && !isLoading && isMiniGamePaused && !isMiniGameHidden && !isGameOver;
         if (miniGamePauseOverlay.gameObject.activeSelf != visible)
             miniGamePauseOverlay.gameObject.SetActive(visible);
     }
 
-    // Shift 키 입력을 감지하여 미니게임 화면 숨김 및 일시정지를 제어
+    // Shift는 누르고 있는 동안 화면만 숨깁니다. 정지가 필요하면 숨기기 전에 Tab을 눌러야 합니다.
     private void HandleShiftHideInput()
     {
-        if (Keyboard.current == null) return;
+        bool held = Keyboard.current != null &&
+            (Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed);
+        if (held != isMiniGameHidden) SetMiniGameHidden(held);
+    }
 
-        bool isShiftPressed = Keyboard.current.leftShiftKey.isPressed || Keyboard.current.rightShiftKey.isPressed;
-
-        // Shift 키를 누르고 있는 동안 -> 숨기기 & 일시정지
-        if (isShiftPressed && !isHidingAndPaused)
+    // 시간·컨트롤러 상태·루트 활성 상태는 변경하지 않습니다. 원래 꺼져 있던 카메라/Canvas도 보존합니다.
+    private void SetMiniGameHidden(bool hidden)
+    {
+        isMiniGameHidden = hidden;
+        if (hidden)
         {
-            PauseAndHideMiniGame(true);
+            CaptureAndHidePresentation(SceneManager.GetSceneByName(currentLoadedMiniGame));
+            CaptureAndHidePresentation(SceneManager.GetSceneByName(loadingMiniGameScene));
         }
-        // Shift 키에서 손을 뗐을 때 -> 다시 보이기 & 재개
-        else if (!isShiftPressed && isHidingAndPaused)
+        else RestorePresentation();
+        RefreshPauseOverlay();
+    }
+
+    private void LateUpdate()
+    {
+        if (!isMiniGameHidden) return;
+        // 게임 실행 중 새 Canvas가 생성되거나 로컬 UI가 갱신되어도 렌더링 직전까지 숨김을 유지합니다.
+        CaptureAndHidePresentation(SceneManager.GetSceneByName(currentLoadedMiniGame));
+        CaptureAndHidePresentation(SceneManager.GetSceneByName(loadingMiniGameScene));
+    }
+
+    private void HandleMiniGameSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        // Additive 로드 완료 콜백은 첫 렌더링보다 먼저 옵니다. Shift 중 씬이 바뀌어도 화면이 깜빡이지 않습니다.
+        if (isMiniGameHidden && scene.name == loadingMiniGameScene) CaptureAndHidePresentation(scene);
+    }
+
+    private void CaptureAndHidePresentation(Scene scene)
+    {
+        if (!scene.IsValid() || !scene.isLoaded) return;
+        foreach (var root in scene.GetRootGameObjects())
         {
-            PauseAndHideMiniGame(false);
+            foreach (var camera in root.GetComponentsInChildren<Camera>(true))
+            {
+                if (!cameraVisibility.ContainsKey(camera)) cameraVisibility.Add(camera, camera.enabled);
+                camera.enabled = false;
+            }
+            foreach (var canvas in root.GetComponentsInChildren<Canvas>(true))
+            {
+                if (!canvasVisibility.ContainsKey(canvas)) canvasVisibility.Add(canvas, canvas.enabled);
+                canvas.enabled = false;
+            }
         }
     }
 
-    /// 미니게임 씬의 오브젝트들을 숨기거나 보이게 하고 시간을 정지/재개
-    // 기존 Shift의 전역 시간 처리는 유지합니다. Tab 정지 상태는 따로 보관해 숨김 해제 후에도 유지합니다.
-    private void PauseAndHideMiniGame(bool pauseAndHide)
+    private void RestorePresentation()
     {
-        isHidingAndPaused = pauseAndHide;
-
-        // 미니게임 씬의 루트 오브젝트 활성화/비활성화
-        foreach (var rootObj in currentMiniGameRootObjects)
-        {
-            if (rootObj != null)
-            {
-                rootObj.SetActive(!pauseAndHide);
-            }
-        }
-
-        // 미니게임 내부 타이머 및 물리 정지를 위해 TimeScale 조절 (필요 시)
-        Time.timeScale = pauseAndHide ? 0f : 1f;
-        RefreshPauseOverlay();
-
-        if (pauseAndHide)
-        {
-            Debug.Log("[MiniGame Paused]: Shift 입력 - 미니게임 화면을 숨기고 일시정지했습니다.");
-        }
-        else
-        {
-            Debug.Log("[MiniGame Resumed]: Shift 해제 - 미니게임을 다시 시작합니다.");
-        }
+        foreach (var item in cameraVisibility) if (item.Key != null) item.Key.enabled = item.Value;
+        foreach (var item in canvasVisibility) if (item.Key != null) item.Key.enabled = item.Value;
+        cameraVisibility.Clear();
+        canvasVisibility.Clear();
     }
 
     private void ResetMiniGamePool()
@@ -206,7 +227,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     // 랜덤 미니게임 씬을 Additive 모드로 로드
     public void LoadRandomMiniGame()
     {
-        if (isLoading || isGameOver || isRestarting) return;
+        if (isLoading || isGameOver || isRestarting || IsGameFinished) return;
         if (currentClearedCount >= totalMiniGamesToClear)
         {
             OnGameEnding();
@@ -248,8 +269,9 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     private IEnumerator RoutineLoadMiniGame(string sceneName)
     {
         isLoading = true;
-
-        if (isHidingAndPaused) PauseAndHideMiniGame(false);
+        // 숨김 입력은 씬 전환 중에도 유지합니다. 이전 씬의 참조만 정리하고 새 씬을 같은 숨김 상태로 받습니다.
+        loadingMiniGameScene = sceneName;
+        RestorePresentation();
         UnbindMiniGameResult(true);
         currentMiniGameCamera = null;
 
@@ -300,7 +322,9 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         }
 
         isLoading = false;
+        loadingMiniGameScene = string.Empty;
         BindMiniGameResult(loadedScene);
+        if (isMiniGameHidden) CaptureAndHidePresentation(loadedScene);
         // 엄마의 발각이 로딩 중 발생했어도, 뒤늦게 로드된 미니게임을 플레이할 수 없게 합니다.
         if (isGameOver && currentMiniGameController != null) currentMiniGameController.StopGame();
     }
@@ -359,13 +383,13 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     // 엄마의 발각 등 새 패배 조건도 이 메서드를 호출합니다. 첫 원인만 확정하고 이후 입력과 결과는 차단합니다.
     public void TriggerGameOver(EGameOverReason reason)
     {
-        if (reason == EGameOverReason.None || isGameOver || isRestarting) return;
+        if (reason == EGameOverReason.None || isGameOver || isRestarting || IsGameFinished) return;
 
         isGameOver = true;
         gameOverReason = reason;
-        // Shift가 만든 0배 시간은 재시작 후 복원할 기준으로 사용하지 않습니다.
-        timeScaleBeforeGameOver = isHidingAndPaused ? 1f : Time.timeScale;
-        if (isHidingAndPaused) PauseAndHideMiniGame(false);
+        // 전역 시간 정지는 MainGame 게임오버에서만 수행합니다. Shift와 Tab은 이 값에 관여하지 않습니다.
+        timeScaleBeforeGameOver = Time.timeScale;
+        if (isMiniGameHidden) SetMiniGameHidden(false);
         if (currentMiniGameController != null) currentMiniGameController.StopGame();
         RefreshPauseOverlay();
         Time.timeScale = 0f;
@@ -436,6 +460,8 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
 
     protected override void OnDestroy()
     {
+        SceneManager.sceneLoaded -= HandleMiniGameSceneLoaded;
+        RestorePresentation();
         UnbindMiniGameResult(false);
         // 게임오버 상태에서 씬을 외부에서 닫더라도 0배 시간이 다음 화면에 남지 않게 합니다.
         if (isGameOver) Time.timeScale = timeScaleBeforeGameOver;
@@ -456,11 +482,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         UnbindMiniGameResult(true);
         currentMiniGameCamera = null;
 
-        if (isHidingAndPaused)
-        {
-            Time.timeScale = 1f;
-            isHidingAndPaused = false;
-        }
+        SetMiniGameHidden(false);
 
         string sceneToUnload = currentLoadedMiniGame;
         currentLoadedMiniGame = string.Empty;
@@ -492,9 +514,12 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         }
     }
 
-    // 기존 전체 목표 달성 처리입니다. 현재는 로그만 출력하며 엔딩 화면 연결은 메인 개발 영역입니다.
+    // 목표 달성은 한 번만 알립니다. 엄마 이벤트를 중단하며, 별도의 엔딩 화면을 여기서 만들지는 않습니다.
     private void OnGameEnding()
     {
+        if (IsGameFinished) return;
+        IsGameFinished = true;
+        GameFinished?.Invoke();
         Debug.Log("게임 승리! 엄마 몰래 18개의 미니게임을 모두 클리어했습니다.");
     }
 }

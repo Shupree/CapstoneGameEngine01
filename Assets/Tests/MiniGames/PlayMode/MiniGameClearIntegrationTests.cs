@@ -35,9 +35,11 @@ namespace GE.MiniGames.PlayModeTests
             manager = Object.FindFirstObjectByType(managerType) as MonoBehaviour;
             Assert.That(manager, Is.Not.Null, "MainGame must contain the existing mini-game manager.");
             yield return WaitFor(() => !Field<bool>("isLoading") && Field<string>("currentLoadedMiniGame") != string.Empty);
+            MainGameTestScenes.UseSnakeAndSecondGame(manager);
             if (Field<string>("currentLoadedMiniGame") != "MiniGame01")
             {
-                Call("LoadRandomMiniGame");
+                // 제품의 선택 목록은 늘어날 수 있으므로 테스트 인스턴스의 다음 씬만 지정합니다.
+                MainGameTestScenes.Load(manager, "MiniGame01");
                 yield return WaitFor(() => !Field<bool>("isLoading") && Field<string>("currentLoadedMiniGame") == "MiniGame01");
             }
             snake = Object.FindFirstObjectByType<SnakeGame>();
@@ -88,8 +90,9 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(Field<int>("currentClearedCount"), Is.EqualTo(before + 1));
             yield return WaitFor(() => !Field<bool>("isLoading") && Field<string>("currentLoadedMiniGame") == "MiniGame02");
             Assert.That(SceneManager.GetSceneByName("MiniGame01").isLoaded, Is.False);
-            Assert.That(Field<MiniGameController>("currentMiniGameController"), Is.Null,
-                "MiniGame02 is currently a legacy placeholder, not a completed second game.");
+            // MiniGame02에도 공통 컨트롤러가 연결된 현재 씬을 검증합니다. 과거의 빈 씬 가정을 사용하지 않습니다.
+            Assert.That(Field<MiniGameController>("currentMiniGameController"), Is.Not.Null);
+            Assert.That(Field<MiniGameController>("currentMiniGameController").GameId, Is.EqualTo("MiniGame02"));
             oldHandler(new MiniGameResult("MiniGame01", run, MiniGameOutcome.Success, 5, 5, "late"));
             Assert.That(Field<int>("currentClearedCount"), Is.EqualTo(before + 1));
 
