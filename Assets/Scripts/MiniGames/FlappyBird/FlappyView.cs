@@ -23,6 +23,8 @@ namespace GE.MiniGames.FlappyBird
         private bool previousSpace, spaceArmed;
         private int stateFrame;
         private const float Scale = 60f;
+        // 모델 좌표의 Scale과 별개로, 모든 그림의 원본 픽셀을 동일한 UI 배율로 표시합니다.
+        private const float SpriteScale = 1.8f;
 
         // 기본 참조는 씬 제작 시 연결하고, 수중 스프라이트와 반복 배경은 씬 Inspector에 저장합니다.
         public void Configure(FlappyGame controller, Image birdImage, Image[] lower, Image[] upper,
@@ -70,6 +72,7 @@ namespace GE.MiniGames.FlappyBird
                 RefreshBackground(model);
                 bird.sprite = birdSprite;
                 bird.color = birdSprite == null ? new Color32(255, 215, 75, 255) : Color.white;
+                if (birdSprite != null) bird.rectTransform.sizeDelta = birdSprite.rect.size * SpriteScale;
                 bird.rectTransform.anchoredPosition = new Vector2(FlappyRules.BirdX, model.BirdY) * Scale;
                 for (int i = 0; i < model.Pipes.Count; i++)
                 {
@@ -106,16 +109,18 @@ namespace GE.MiniGames.FlappyBird
             Rect viewport = flowingBackground.rectTransform.rect;
             if (viewport.width <= 0f || viewport.height <= 0f) return;
             Texture texture = flowingBackground.texture;
-            float tileWidth = viewport.height * texture.width / texture.height;
+            float tileWidth = texture.width * SpriteScale;
+            float tileHeight = texture.height * SpriteScale;
             float distance = (model.Rules.firstPipeX - model.Pipes[0].X) * Scale * backgroundParallax;
-            // U 좌표를 증가시키면 무늬가 왼쪽으로 흐릅니다. 원본 비율과 Repeat 샘플링을
-            // 유지하여 화면 크기 변경과 반복 경계에서도 빈틈 없이 연결합니다.
+            // U 좌표를 증가시키면 무늬가 왼쪽으로 흐릅니다. 화면 폭에 맞춰 늘리는 대신
+            // 원본의 1.8배 크기로 반복하므로 물고기·해초와 배경의 도트 크기가 같습니다.
             flowingBackground.uvRect = new Rect(Mathf.Repeat(distance / tileWidth, 1f), 0f,
-                viewport.width / tileWidth, 1f);
+                viewport.width / tileWidth, viewport.height / tileHeight);
         }
 
-        // 판정 사각형은 그대로 유지하되 가장 비슷한 종횡비의 해초를 골라 늘어남을 줄입니다.
-        private Sprite SeaweedSprite(float height, float width)
+        // 통과 공간에서 화면 경계까지 닿는 가장 짧은 원본을 선택합니다. 초과한 뿌리는
+        // Playfield의 기존 마스크 밖으로 보내며, 그림 자체의 가로·세로 배율은 바꾸지 않습니다.
+        private Sprite SeaweedSprite(float height)
         {
             Sprite selected = pipeSprite;
             float bestDifference = float.PositiveInfinity;
@@ -123,7 +128,9 @@ namespace GE.MiniGames.FlappyBird
             foreach (Sprite sprite in seaweedSprites)
             {
                 if (sprite == null) continue;
-                float difference = Mathf.Abs(sprite.rect.height / sprite.rect.width - height / width);
+                float difference = sprite.rect.height * SpriteScale - height * Scale;
+                // 기본 씬에서는 가장 긴 해초가 모든 높이를 덮습니다. 부족한 후보보다 긴 후보를 우선합니다.
+                if (difference < 0f) difference = 10000f - difference;
                 if (difference >= bestDifference) continue;
                 selected = sprite;
                 bestDifference = difference;
@@ -133,12 +140,29 @@ namespace GE.MiniGames.FlappyBird
 
         private void PlacePipe(Image image, float x, float y, float height, float width, bool upper)
         {
-            image.sprite = SeaweedSprite(height, width);
+            image.sprite = SeaweedSprite(height);
             image.color = image.sprite == null ? new Color32(54, 149, 118, 255) : Color.white;
-            image.rectTransform.anchoredPosition = new Vector2(x, y) * Scale;
-            image.rectTransform.sizeDelta = new Vector2(width, height) * Scale;
+            Vector2 size = image.sprite != null ? image.sprite.rect.size * SpriteScale : new Vector2(width, height) * Scale;
+            float tip = (y + (upper ? -height : height) * 0.5f) * Scale;
+            image.rectTransform.anchoredPosition = new Vector2(x * Scale, tip + (upper ? size.y : -size.y) * 0.5f);
+            image.rectTransform.sizeDelta = size;
             // 위쪽 해초의 뿌리는 천장에, 잎 끝은 통과 공간을 향하게 합니다.
             image.rectTransform.localScale = new Vector3(1f, upper ? -1f : 1f, 1f);
+        }
+
+        // FlappyGame이 모델을 만든 직후 호출합니다. 확대된 물고기와 해초의 표시 크기를
+        // 게임 단위로 넘겨, 보이는 그림을 통과하거나 점수를 너무 일찍 얻지 않도록 합니다.
+        internal void ConfigureVisualBounds(FlappyModel model)
+        {
+            if (birdSprite != null) model.BirdHalfSize = birdSprite.rect.size * (SpriteScale / Scale * 0.5f);
+            foreach (var pipe in model.Pipes)
+            {
+                float bottomHeight = FlappyRules.Height * 0.5f + pipe.GapY - model.Rules.gapHeight * 0.5f;
+                float topHeight = FlappyRules.Height * 0.5f - pipe.GapY - model.Rules.gapHeight * 0.5f;
+                Sprite lower = SeaweedSprite(bottomHeight), upper = SeaweedSprite(topHeight);
+                if (lower != null) pipe.LowerWidth = lower.rect.width * SpriteScale / Scale;
+                if (upper != null) pipe.UpperWidth = upper.rect.width * SpriteScale / Scale;
+            }
         }
     }
 }

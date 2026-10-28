@@ -160,5 +160,35 @@ namespace GE.MiniGames.Tests
             Assert.That(model.Result, Is.EqualTo(FlappyStep.Success));
             Assert.That(model.Passed, Is.EqualTo(15));
         }
+
+        // 원본 1.8배 물고기의 앞부분이 닿는 시점과 넓이가 다른 위·아래 해초를 각각 검증합니다.
+        [TestCase(false)]
+        [TestCase(true)]
+        public void NativeSizeCollision_UsesEachSeaweedWidth(bool upper)
+        {
+            var model = new FlappyModel(new FlappyRules { gapHeight = 4.5f });
+            model.BirdHalfSize = new Vector2(1.32f, 0.96f);
+            var pipe = model.Pipes[0];
+            pipe.LowerWidth = upper ? 0.5f : 1.68f;
+            pipe.UpperWidth = upper ? 1.68f : 0.5f;
+            pipe.GapY = upper ? -1.6f : 1.6f;
+            pipe.X = FlappyRules.BirdX + 2f;
+            Assert.That(model.Step(0.001f), Is.EqualTo(FlappyStep.PipeCollision));
+            Assert.That(model.Passed, Is.Zero);
+        }
+
+        [Test]
+        public void NativeSizeScore_WaitsForFishAndWiderSeaweedToClear()
+        {
+            var model = new FlappyModel(new FlappyRules { gapHeight = 4.5f });
+            model.BirdHalfSize = new Vector2(1.32f, 0.96f);
+            var pipe = model.Pipes[0];
+            pipe.LowerWidth = 1.32f; pipe.UpperWidth = 1.68f;
+            pipe.X = FlappyRules.BirdX - 1.32f - 1.68f / 2 + 0.05f;
+            model.Step(0.001f);
+            Assert.That(model.Passed, Is.Zero);
+            model.Step(0.03f);
+            Assert.That(model.Passed, Is.EqualTo(1));
+        }
     }
 }

@@ -13,7 +13,12 @@ namespace GE.MiniGames.FlappyBird
         public override int Target => FlappyRules.Goal;
         public override string StartInstructions => "Spacebar를 누를 때마다 위로 날아갑니다.\n파이프 15쌍을 통과하세요.\n파이프와 위·아래 경계에 닿으면 실패합니다.";
 
-        protected override void OnResetGame() { Model = new FlappyModel(rules); }
+        // 표시 계층의 원본 배율로 판정 크기를 확정한 뒤 첫 프레임을 진행합니다.
+        protected override void OnResetGame()
+        {
+            Model = new FlappyModel(rules);
+            GetComponent<FlappyView>()?.ConfigureVisualBounds(Model);
+        }
         internal override void OnGameInput(GameButtons pressed)
         {
             // 공통 API가 눌림 순간만 전달하므로 키 유지로 연속 날갯짓하지 않습니다.

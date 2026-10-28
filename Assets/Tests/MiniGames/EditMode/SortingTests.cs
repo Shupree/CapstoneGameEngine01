@@ -8,6 +8,49 @@ namespace GE.MiniGames.Tests
     public sealed class SortingTests
     {
         [Test]
+        public void Preview_FollowsActualOrderWithoutConsuming_AndShrinksAtEnd()
+        {
+            var model = new SortingModel(30, 8);
+            while (model.Remaining > 0)
+            {
+                int remaining = model.Remaining;
+                var current = model.Current;
+                Assert.That(model.TryPeek(0, out var peekedCurrent), Is.True);
+                Assert.That(peekedCurrent, Is.EqualTo(current));
+                bool hasNext = model.TryPeek(1, out var next);
+                bool hasSecond = model.TryPeek(2, out var second);
+                // 조회를 반복해도 추첨하거나 현재 물건을 소비하지 않는지 확인합니다.
+                Assert.That(model.TryPeek(1, out var repeated), Is.EqualTo(hasNext));
+                Assert.That(repeated, Is.EqualTo(next));
+                Assert.That(model.Current, Is.EqualTo(current));
+                Assert.That(model.Remaining, Is.EqualTo(remaining));
+                Assert.That(hasNext, Is.EqualTo(remaining > 1));
+                Assert.That(hasSecond, Is.EqualTo(remaining > 2));
+                model.Submit(SortingModel.RequiredChoice(current));
+                if (hasNext) Assert.That(model.Current, Is.EqualTo(next));
+                if (hasSecond)
+                {
+                    Assert.That(model.TryPeek(1, out var shifted), Is.True);
+                    Assert.That(shifted, Is.EqualTo(second));
+                }
+            }
+            Assert.That(model.TryPeek(0, out _), Is.False);
+            Assert.That(model.TryPeek(1, out _), Is.False);
+            Assert.That(model.TryPeek(2, out _), Is.False);
+        }
+
+        [TestCase(-1)]
+        [TestCase(30)]
+        [TestCase(int.MaxValue)]
+        public void Preview_InvalidOffsetReturnsFalse(int offset)
+        {
+            // 큰 오프셋도 인덱스 덧셈 전에 거부하여 표시 코드가 잘못 조회해도 예외를 내지 않습니다.
+            var model = new SortingModel(30, 8);
+            Assert.That(model.TryPeek(offset, out _), Is.False);
+            Assert.That(model.Remaining, Is.EqualTo(30));
+        }
+
+        [Test]
         public void ThirtyCorrect_StopsImmediately()
         {
             var model = new SortingModel(30, 8);

@@ -11,13 +11,15 @@ namespace GE.MiniGames.Sorting
         [SerializeField] private SortingGame game;
         [SerializeField] private Image currentItem;
         [SerializeField] private Sprite[] itemSprites;
+        // 앞에서부터 다음 1번째·2번째 물건의 Image입니다. 기존 씬 구성 API의 슬롯을 재사용합니다.
         [SerializeField] private GameObject[] stackCards;
         [SerializeField] private TMP_Text progress, remaining, itemName, heading, description, hint;
         [SerializeField] private RectTransform progressFill;
         [SerializeField] private GameObject overlay;
         private bool previousSpace, spaceArmed;
         private int stateFrame;
-        private static readonly string[] ItemNames = { "상자", "병", "돌", "잎", "볼트" };
+        // 기존 모델의 Box/Bottle/Stone/Leaf/Bolt 순서는 유지하고 씬의 새 장난감 이미지와 표시 이름만 대응합니다.
+        private static readonly string[] ItemNames = { "곰 인형", "로봇", "오리", "닭", "파란 새" };
 
         // 참조는 저장된 씬에 직렬화합니다. 런타임에 다른 씬이나 에셋을 찾아 수정하지 않습니다.
         public void Configure(SortingGame controller, Image item, Sprite[] sprites, GameObject[] cards,
@@ -69,8 +71,7 @@ namespace GE.MiniGames.Sorting
             itemName.text = hasItem ? ItemNames[(int)model.Current] : "완료";
             if (hasItem && itemSprites != null && itemSprites.Length == 5)
                 currentItem.sprite = itemSprites[(int)model.Current];
-            for (int i = 0; i < stackCards.Length; i++)
-                stackCards[i].SetActive(model != null && model.Remaining > i + 1);
+            RefreshPreviews(model);
             progress.text = $"정답  {game.Progress:00} / {game.Target:00}";
             remaining.text = $"남은 수  {(model?.Remaining ?? 0):00}";
             progressFill.anchorMax = new Vector2((float)game.Progress / game.Target, 1);
@@ -87,6 +88,26 @@ namespace GE.MiniGames.Sorting
                 heading.text = state == MiniGameState.Succeeded ? "성공!" : "다시 도전!";
                 description.text = $"{game.ResultReason}\n정답 {game.Progress} / {game.Target}";
                 hint.text = "SPACE를 놓고 다시 눌러 재시도";
+            }
+        }
+
+        // 실제 모델 순서를 읽기만 합니다. 정답 처리 후에는 다음 물건으로 이동하고,
+        // 정지·오답 때는 같은 그림을 유지하며 완료·Stop 때는 남은 미리보기를 모두 숨깁니다.
+        private void RefreshPreviews(SortingModel model)
+        {
+            if (stackCards == null) return;
+            for (int i = 0; i < stackCards.Length; i++)
+            {
+                var preview = stackCards[i];
+                if (preview == null) continue;
+                var image = preview.GetComponent<Image>();
+                SortingItem next = default;
+                bool visible = image != null && model != null && model.TryPeek(i + 1, out next) &&
+                    itemSprites != null && itemSprites.Length == ItemNames.Length;
+                preview.SetActive(visible);
+                if (!visible) continue;
+                image.sprite = itemSprites[(int)next];
+                image.preserveAspect = true;
             }
         }
     }

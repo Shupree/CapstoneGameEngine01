@@ -26,6 +26,9 @@ namespace GE.MiniGames.Snake
         [SerializeField] private Sprite appleSprite;
         [SerializeField] private Sprite headUpSprite, headLeftSprite, headDownSprite, headRightSprite;
 
+        // 타일·몸통·사과·머리에 같은 원본 픽셀 배율을 적용합니다. 격자 개수가 바뀌어도 도트 크기는 유지합니다.
+        private const float SpriteScale = 1.8f;
+
         private static readonly Color BodyColor = new Color32(106, 204, 143, 255);
         private static readonly Color HeadColor = new Color32(202, 245, 142, 255);
         private static readonly Color AppleColor = new Color32(252, 108, 101, 255);
@@ -49,6 +52,7 @@ namespace GE.MiniGames.Snake
             }
             pixels.Clear();
             columns = width; rows = height;
+            if (tileSprite != null) board.sizeDelta = new Vector2(width, height) * tileSprite.rect.width * SpriteScale;
             grid = Rect("Grid", board, Vector2.zero, board.sizeDelta);
             float cell = Mathf.Min(board.sizeDelta.x / width, board.sizeDelta.y / height);
             for (int y = 0; y < height; y++)
@@ -58,7 +62,11 @@ namespace GE.MiniGames.Snake
                 Image tile = Pixel($"Cell {x},{y}", grid, position, Vector2.one * (cell - 2),
                     (x + y) % 2 == 0 ? new Color32(27, 48, 46, 255) : new Color32(30, 53, 49, 255));
                 tile.sprite = tileSprite;
-                if (tileSprite != null) tile.color = Color.white;
+                if (tileSprite != null)
+                {
+                    tile.color = Color.white;
+                    tile.rectTransform.sizeDelta = tileSprite.rect.size * SpriteScale;
+                }
             }
             // 머리의 돌출된 혀가 이웃 타일에 가려지지 않도록 모든 토큰을 타일보다 나중에 그립니다.
             for (int y = 0; y < height; y++)
@@ -142,9 +150,8 @@ namespace GE.MiniGames.Snake
             {
                 // 원본 몸통은 28px, 머리는 혀 방향으로 8px 더 깁니다. 몸통 중심을 격자에 맞추고
                 // 혀만 이동 방향으로 돌출시켜 네 방향 모두 몸통과 동일한 배율을 유지합니다.
-                float scale = CellSize * 0.78f / 28f;
-                size = sprite.rect.size * scale;
-                offset = (Vector2)direction * ((Mathf.Max(size.x, size.y) - CellSize * 0.78f) * 0.5f);
+                size = sprite.rect.size * SpriteScale;
+                offset = (Vector2)direction * ((Mathf.Max(sprite.rect.width, sprite.rect.height) - 28f) * SpriteScale * 0.5f);
             }
             image.rectTransform.sizeDelta = size;
             // 기존 씬의 타일 자식 토큰도 지원하며, 새 씬은 토큰을 Grid 직속으로 배치합니다.

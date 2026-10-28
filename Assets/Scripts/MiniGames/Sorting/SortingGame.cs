@@ -13,8 +13,9 @@ namespace GE.MiniGames.Sorting
         public override string GameId => "MiniGame03";
         public override int Progress => Model?.Correct ?? 0;
         public override int Target => Model?.Target ?? Mathf.Max(1, targetCount);
+        // 메인 안내 UI도 같은 문구를 사용하므로 새 그림의 분류 대상을 여기에서 함께 안내합니다.
         public override string StartInstructions =>
-            $"A  상자     D  병\nSPACE  돌 · 잎 · 볼트\n{Target}개를 정확하게 분류하세요.\n오답은 실패! 메인 목숨 1개 차감 후 처음부터 재도전합니다.";
+            $"A  곰     D  로봇\nSPACE  기타 장난감 3종\n{Target}개를 정확하게 분류하세요.\n오답은 실패! 메인 목숨 1개 차감 후 처음부터 재도전합니다.";
 
         // 재시도마다 새 묶음을 만들고 정답 수와 남은 수를 초기화합니다. 누적 목숨은 메인이 유지합니다.
         protected override void OnResetGame()

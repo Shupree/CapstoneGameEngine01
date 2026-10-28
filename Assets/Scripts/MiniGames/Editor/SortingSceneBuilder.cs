@@ -71,7 +71,7 @@ namespace GE.MiniGames.Editor
             var fill = Panel("Progress fill", track.transform, Vector2.zero, Vector2.zero, Mint).rectTransform;
             fill.anchorMin = Vector2.zero; fill.anchorMax = new Vector2(0, 1); fill.offsetMin = fill.offsetMax = Vector2.zero;
             Panel("Playfield", content, new Vector2(0, 0), new Vector2(960, 380), new Color32(34, 62, 67, 255));
-            // 뒤의 두 카드는 남은 묶음을 표시하는 장식입니다. 정답 입력은 맨 앞 모델 하나에만 적용됩니다.
+            // 뒤의 두 이미지는 다음 두 물건을 미리 보여 줍니다. 분류 입력은 맨 앞 모델 하나에만 적용됩니다.
             var back2 = Panel("Stack back 2", content, new Vector2(24, 38), new Vector2(250, 240), new Color32(61, 91, 93, 255));
             var back1 = Panel("Stack back 1", content, new Vector2(12, 24), new Vector2(250, 240), new Color32(104, 133, 126, 255));
             var card = Panel("Current card", content, new Vector2(0, 10), new Vector2(250, 240), Paper);

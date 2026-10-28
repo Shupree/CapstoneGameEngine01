@@ -16,6 +16,16 @@ namespace GE.MiniGames.Sorting
         public bool IsFinished { get; private set; }
         public SortingItem Current => items[Math.Min(Correct, Target - 1)];
 
+        // 표시 계층은 현재 물건을 0으로 하는 상대 순서만 조회합니다. 추첨이나 정답 수를
+        // 변경하지 않으며 마지막 물건 뒤를 조회하면 false를 반환해 미리보기를 숨길 수 있습니다.
+        public bool TryPeek(int offset, out SortingItem item)
+        {
+            item = default;
+            if (offset < 0 || offset >= Remaining) return false;
+            item = items[Correct + offset];
+            return true;
+        }
+
         public SortingModel(int target = 30, int? seed = null)
         {
             if (target < 1) throw new ArgumentOutOfRangeException(nameof(target));

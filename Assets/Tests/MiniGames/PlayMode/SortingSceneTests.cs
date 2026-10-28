@@ -117,6 +117,76 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator SavedScene_TwoPreviewsAdvancePauseAndDisappearAtEnd()
+        {
+            yield return Load();
+            var game = Object.FindFirstObjectByType<SortingGame>();
+            var view = game.GetComponent<SortingView>();
+            var cards = (GameObject[])typeof(SortingView).GetField("stackCards",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(view);
+            Assert.That(cards.Length, Is.EqualTo(2));
+            var first = cards[0].GetComponent<UnityEngine.UI.Image>();
+            var second = cards[1].GetComponent<UnityEngine.UI.Image>();
+            var current = (UnityEngine.UI.Image)typeof(SortingView).GetField("currentItem",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(view);
+            yield return Keys(Key.Space);
+            yield return Keys();
+            // 서로 다른 첫 세 물건을 주입해 미리보기와 실제 소비 순서를 명확하게 비교합니다.
+            var items = (SortingItem[])typeof(SortingModel).GetField("items",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(game.Model);
+            items[0] = SortingItem.Box;
+            items[1] = SortingItem.Bottle;
+            items[2] = SortingItem.Stone;
+            items[3] = SortingItem.Leaf;
+            view.Refresh();
+            Assert.That(current.sprite.name, Is.EqualTo("003_item_bear_L"));
+            Assert.That(first.sprite.name, Is.EqualTo("003_item_robot_R"));
+            Assert.That(second.sprite.name, Is.EqualTo("003_item_else_1"));
+            Assert.That(cards[0].activeSelf && cards[1].activeSelf, Is.True);
+            Assert.That(second.transform.GetSiblingIndex(), Is.LessThan(first.transform.GetSiblingIndex()));
+            Assert.That(first.transform.GetSiblingIndex(), Is.LessThan(current.transform.parent.GetSiblingIndex()));
+            Capture(game, "Preview", 1280, 960);
+
+            yield return Keys(Key.Tab);
+            yield return Keys(Key.A);
+            Assert.That(game.State, Is.EqualTo(MiniGameState.Paused));
+            Assert.That(game.Progress, Is.Zero);
+            Assert.That(first.sprite.name, Is.EqualTo("003_item_robot_R"));
+            yield return Keys();
+            yield return Keys(Key.Tab);
+            yield return Keys();
+            yield return Keys(Key.A);
+            Assert.That(game.Progress, Is.EqualTo(1));
+            Assert.That(current.sprite.name, Is.EqualTo("003_item_robot_R"));
+            Assert.That(first.sprite.name, Is.EqualTo("003_item_else_1"));
+            Assert.That(second.sprite.name, Is.EqualTo("003_item_else_2"));
+
+            // 마지막 두 물건부터 1개, 0개로 줄고 완료 시에도 마지막 그림을 반복하지 않아야 합니다.
+            while (game.Model.Remaining > 2)
+            {
+                yield return Keys();
+                yield return Keys(KeyFor(game.Model.Current));
+            }
+            Assert.That(cards[0].activeSelf, Is.True);
+            Assert.That(cards[1].activeSelf, Is.False);
+            Capture(game, "Preview-LastTwo", 1280, 960);
+            yield return Keys();
+            yield return Keys(KeyFor(game.Model.Current));
+            Assert.That(cards[0].activeSelf || cards[1].activeSelf, Is.False);
+            Assert.That(current.enabled, Is.True);
+            yield return Keys();
+            yield return Keys(KeyFor(game.Model.Current));
+            Assert.That(game.State, Is.EqualTo(MiniGameState.Succeeded));
+            Assert.That(cards[0].activeSelf || cards[1].activeSelf, Is.False);
+            yield return Keys();
+            yield return Keys(Key.Space);
+            Assert.That(cards[0].activeSelf && cards[1].activeSelf, Is.True);
+            game.StopGame();
+            yield return null; // 표시 계층은 다음 Update에서 정리된 모델을 반영합니다.
+            Assert.That(cards[0].activeSelf || cards[1].activeSelf, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator ExistingManager_ReceivesFailureOnce_AndFinalClearUnloadsScene()
         {
             yield return Load();

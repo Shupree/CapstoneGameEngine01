@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GE.MiniGames.FlappyBird
 {
-    // 화면과 무관한 게임 단위입니다. 에셋을 교체해도 판정 크기와 난이도는 유지합니다.
+    // 화면과 무관한 게임 단위입니다. 원본 그림의 판정 크기는 모델 생성 직후 표시 계층에서 전달합니다.
     [Serializable]
     public sealed class FlappyRules
     {
@@ -42,6 +42,9 @@ namespace GE.MiniGames.FlappyBird
         public float X { get; internal set; }
         public float GapY { get; internal set; }
         public bool Counted { get; internal set; }
+        // 위·아래 해초는 서로 다른 원본을 사용할 수 있으므로 판정 폭도 각각 보관합니다.
+        public float LowerWidth { get; internal set; }
+        public float UpperWidth { get; internal set; }
     }
 
     // 공통 컨트롤러가 시간과 눌림 순간을 전달하며, 이 모델은 로컬 규칙만 판정합니다.
@@ -54,6 +57,7 @@ namespace GE.MiniGames.FlappyBird
         public float Velocity { get; private set; }
         public int Passed { get; private set; }
         public FlappyStep Result { get; private set; }
+        public Vector2 BirdHalfSize { get; internal set; } = new Vector2(FlappyRules.BirdHalfWidth, FlappyRules.BirdHalfHeight);
 
         public FlappyModel(FlappyRules rules)
         {
@@ -65,7 +69,8 @@ namespace GE.MiniGames.FlappyBird
             {
                 // 첫 파이프는 중앙에 두고 다음 높이 변화는 제한해 갑작스러운 난이도 급증을 피합니다.
                 if (i > 0) gap = Mathf.Clamp(gap + (float)(random.NextDouble() * 1.8 - 0.9), -1.6f, 1.6f);
-                pipes.Add(new FlappyPipe { X = Rules.firstPipeX + i * Rules.pipeSpacing, GapY = gap });
+                pipes.Add(new FlappyPipe { X = Rules.firstPipeX + i * Rules.pipeSpacing, GapY = gap,
+                    LowerWidth = Rules.pipeWidth, UpperWidth = Rules.pipeWidth });
             }
             Velocity = Rules.flapSpeed;
         }
@@ -95,35 +100,39 @@ namespace GE.MiniGames.FlappyBird
             Velocity -= Rules.gravity * dt;
             float peak = oldVelocity > 0f && Velocity < 0f
                 ? oldY + oldVelocity * oldVelocity / (2f * Rules.gravity) : Mathf.Max(oldY, BirdY);
-            if (Mathf.Min(oldY, BirdY) - FlappyRules.BirdHalfHeight <= -FlappyRules.Height / 2f ||
-                peak + FlappyRules.BirdHalfHeight >= FlappyRules.Height / 2f)
+            if (Mathf.Min(oldY, BirdY) - BirdHalfSize.y <= -FlappyRules.Height / 2f ||
+                peak + BirdHalfSize.y >= FlappyRules.Height / 2f)
             { Result = FlappyStep.BoundaryCollision; return; }
 
             foreach (var pipe in pipes)
             {
                 float oldX = pipe.X;
                 pipe.X -= Rules.pipeSpeed * dt;
-                float extent = Rules.pipeWidth / 2f + FlappyRules.BirdHalfWidth;
-                // 새와 파이프의 상대 이동에서 겹치는 시간 구간만 검사합니다. 접촉도 충돌입니다.
-                float enter = Mathf.Clamp01((oldX - FlappyRules.BirdX - extent) / (Rules.pipeSpeed * dt));
-                float leave = Mathf.Clamp01((oldX - FlappyRules.BirdX + extent) / (Rules.pipeSpeed * dt));
-                if (oldX + extent >= FlappyRules.BirdX && pipe.X - extent <= FlappyRules.BirdX)
-                {
-                    float y1 = oldY + oldVelocity * dt * enter - 0.5f * Rules.gravity * dt * dt * enter * enter;
-                    float y2 = oldY + oldVelocity * dt * leave - 0.5f * Rules.gravity * dt * dt * leave * leave;
-                    float maxY = Mathf.Max(y1, y2);
-                    float apexT = oldVelocity / Rules.gravity / dt;
-                    if (apexT >= enter && apexT <= leave) maxY = Mathf.Max(maxY, oldY + oldVelocity * oldVelocity / (2f * Rules.gravity));
-                    if (Mathf.Min(y1, y2) - FlappyRules.BirdHalfHeight <= pipe.GapY - Rules.gapHeight / 2f ||
-                        maxY + FlappyRules.BirdHalfHeight >= pipe.GapY + Rules.gapHeight / 2f)
-                    { Result = FlappyStep.PipeCollision; return; }
-                }
+                if (HitsPipe(pipe, pipe.LowerWidth, false, oldX, oldY, oldVelocity, dt) ||
+                    HitsPipe(pipe, pipe.UpperWidth, true, oldX, oldY, oldVelocity, dt))
+                { Result = FlappyStep.PipeCollision; return; }
             }
             // 모든 충돌 검사를 먼저 끝냅니다. 같은 구간의 충돌보다 성공 판정이 앞서지 않게 합니다.
             foreach (var pipe in pipes)
-                if (!pipe.Counted && pipe.X + Rules.pipeWidth / 2f < FlappyRules.BirdX - FlappyRules.BirdHalfWidth)
+                if (!pipe.Counted && pipe.X + Mathf.Max(pipe.LowerWidth, pipe.UpperWidth) / 2f < FlappyRules.BirdX - BirdHalfSize.x)
                 { pipe.Counted = true; Passed++; }
             if (Passed >= FlappyRules.Goal) Result = FlappyStep.Success;
+        }
+
+        // 원본마다 다른 폭으로 접촉 구간을 계산하되 기존 연속 충돌 검사와 최고점 검사를 유지합니다.
+        private bool HitsPipe(FlappyPipe pipe, float width, bool upper, float oldX, float oldY, float oldVelocity, float dt)
+        {
+            float extent = width / 2f + BirdHalfSize.x;
+            if (oldX + extent < FlappyRules.BirdX || pipe.X - extent > FlappyRules.BirdX) return false;
+            float enter = Mathf.Clamp01((oldX - FlappyRules.BirdX - extent) / (Rules.pipeSpeed * dt));
+            float leave = Mathf.Clamp01((oldX - FlappyRules.BirdX + extent) / (Rules.pipeSpeed * dt));
+            float y1 = oldY + oldVelocity * dt * enter - 0.5f * Rules.gravity * dt * dt * enter * enter;
+            float y2 = oldY + oldVelocity * dt * leave - 0.5f * Rules.gravity * dt * dt * leave * leave;
+            if (!upper) return Mathf.Min(y1, y2) - BirdHalfSize.y <= pipe.GapY - Rules.gapHeight / 2f;
+            float maxY = Mathf.Max(y1, y2);
+            float apexT = oldVelocity / Rules.gravity / dt;
+            if (apexT >= enter && apexT <= leave) maxY = Mathf.Max(maxY, oldY + oldVelocity * oldVelocity / (2f * Rules.gravity));
+            return maxY + BirdHalfSize.y >= pipe.GapY + Rules.gapHeight / 2f;
         }
     }
 }
