@@ -4954,6 +4954,7 @@ GameObject:
   - component: {fileID: 2019471561}
   - component: {fileID: 2019471560}
   - component: {fileID: 2019471563}
+  - component: {fileID: 2019471564}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -5079,6 +5080,22 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &2019471564
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2019471559}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 897581394a8239740b6af476e15d4f5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MainGameCameraLookController
+  miniGameManager: {fileID: 1381342806}
+  leftYawOffset: -50.17013
+  rightYawOffset: 30.519867
+  rotationSpeedDegreesPerSecond: 66.89351
 --- !u!1 &2021973968
 GameObject:
   m_ObjectHideFlags: 0

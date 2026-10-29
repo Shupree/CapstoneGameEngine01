@@ -66,6 +66,7 @@ Lobby
 | `Assets/Scripts/MainGame/MotherActorController.cs` | Inspector 이동 지점을 따라 이동·회전하고 기존 Run을 감속한다. 이벤트 주기나 게임오버를 관리하지 않는다. |
 | `Assets/Scripts/MainGame/DoorController.cs` | 기존 경첩 회전과 Open/Close/IsOpen/IsClosed API. 입력과 발각 판정은 외부 책임이다. |
 | `Assets/Scripts/MainGame/MainGameDeveloperTools.cs` | Editor·Development Build 전용 텍스트 버튼 UI. 이벤트 즉시 실행과 지정 미니게임 로드를 매니저 API에 위임한다. |
+| `Assets/Scripts/MainGame/MainGameCameraLookController.cs` | MainGame 카메라의 좌우 시선. Shift 숨김에서만 화살표 입력을 받고 마지막 각도를 유지한다. Inspector의 끝 각도와 좌우 공통 각속도를 사용한다. |
 | `Assets/Scripts/MiniGames/Common` | `IMiniGame`, `MiniGameController`, 결과·상태 계약, 단독 실행용 UI. 변경 시 모든 미니게임에 미칠 영향을 확인한다. |
 | `Assets/Scripts/MiniGames/Snake` | 스네이크 규칙·로컬 실행·화면 표시. 전체 목숨이나 다음 씬을 직접 관리하지 않는다. |
 | `Assets/Scripts/MiniGames/Editor` | Editor 전용 씬 구성·검증 도구. 런타임 코드와 분리한다. |
@@ -112,6 +113,7 @@ Lobby
 | Shift 누름 | 미니게임의 Camera·Canvas만 숨긴다. 루트·로직·물리·전역 시간은 계속 진행된다. |
 | Shift 해제 | 게임기를 다시 표시한다. 숨기기 전에 Tab으로 정지했다면 정지 상태를 유지한다. |
 | Shift로 숨긴 동안 | Tab으로 정지 상태를 바꾸지 않는다. MainGame에 배치한 정지 오버레이도 함께 숨긴다. |
+| 숨긴 동안 좌우 화살표 | MainGame 카메라만 수평 회전한다. 왼쪽 키는 책상·모니터, 오른쪽 키는 창문까지 제한하며 키 해제·화면 복원 후에도 마지막 각도를 유지한다. |
 | MainGame 게임오버 | 현재 전체 진행을 `Time.timeScale = 0`으로 정지한다. 클릭 UI는 계속 작동해야 한다. |
 | MiniGame01 단독 실행 | 메인 매니저를 만들지 않고 기존 Space 시작·재시도와 자체 Tab 정지·재개를 유지한다. |
 
@@ -177,6 +179,7 @@ MainGame
 - MainGame과 Additive 미니게임을 합쳐 **활성 EventSystem은 하나**로 유지한다. 매니저가 미니게임 씬의 EventSystem과 입력 모듈을 런타임에 비활성화하는 처리를 보존한다.
 - 미니게임 카메라는 매니저가 지정하는 viewport를 따른다. 현재 기본값은 `(0.15, 0.15, 0.7, 0.7)`, depth는 `1`이다. 전체 화면으로 덮어쓰지 않는다.
 - 새 미니게임 카메라가 `Camera.main` 선택을 방해하지 않도록 태그를 확인한다. 카메라·Canvas·조명·오디오 등 Additive 씬 간 간섭을 함께 확인한다.
+- `Base/Main Camera`의 시선은 `MainGameCameraLookController`가 담당한다. 위치·상하 각도·기울기·FOV·미니게임 카메라는 유지하며 Y축만 회전한다. Inspector의 `Left Yaw Offset`(음수, 책상)과 `Right Yaw Offset`(양수, 창문)으로 한계를 조절한다. `Rotation Speed Degrees Per Second`는 좌우 공통 각속도이며 기존 책상 속도인 약 66.89도/초를 기준으로 한다. 양끝까지 같은 시간을 쓰는 정규화 이동으로 되돌리면 좌우 속도가 달라지므로 실제 각도를 초당 일정하게 이동한다. 자동 상향 회전·FOV 보정을 다시 추가하지 않는다. 화면 재표시·미니게임 교체는 마지막 시선을 유지하고 전체 Retry에서만 최초 구도로 돌아온다.
 - 씬 구성 도구를 실행하기 전에 기존 씬의 저장 상태를 확인한다. 기존 씬을 파괴하고 다시 만들어 UI 문제를 해결하지 않는다.
 
 ## 9. Unity 환경과 연결 문제
@@ -211,6 +214,7 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 | PlayMode `MainGameMotherEventIntegrationTests` | 실제 소리 종료·문 시작 기준 시간, 침대 관찰·퇴장, 닫힘 중 발각, Tab 상태의 발각, 재시작·목표 달성 시 이벤트 수명 |
 | PlayMode `MainGameFootstepsEventTests` | 75:25 가중치 경계·0/비활성 제외·기존 참조 이전, 원본 소리 두 번 재생·1초 대기·무발각·문/엄마 정지·취소 |
 | PlayMode `MainGameDeveloperToolsTests` | 저장된 버튼 클릭·Raycaster, 이벤트 취소·재실행, 지정 미니게임 Ready 전환·진행도 보존, 종료 시 차단, Inspector 시간 적용 |
+| PlayMode `MainGameCameraLookTests` | 실제 숨김·화살표 방향, 부드러운 수평 회전과 제한, 좌우·정면 통과 각속도 일치, 각도 보존·FOV 고정, Tab 정지·메인 시간·미니게임 교체·전체 재시작 |
 
 관련 기능을 수정한 경우 다음을 확인한다.
 

@@ -12,6 +12,7 @@
 - `DoorController`: 기존 문 회전 API를 재사용한다.
 - `MiniGameManager`: Shift 숨김 상태를 제공하고 게임오버·전체 재시작을 담당한다. `GameOverTriggered`와 `GameFinished`를 받으면 Director가 진행 중 이벤트와 다음 타이머를 취소한다.
 - `MainGameDeveloperTools`: Editor와 Development Build의 개발자 도구 표시·버튼 상태만 관리한다. 버튼의 실제 동작은 Director와 MiniGameManager의 공통 API에 위임한다.
+- `MainGameCameraLookController`: MainGame 카메라의 시선만 제어한다. 매니저가 제공하는 숨김 상태에서 좌우 키를 받고, 마지막 각도와 양쪽 끝의 시선 제한을 유지한다.
 
 ## 문 방문 순서
 
@@ -100,5 +101,19 @@ MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. �
 | Tab으로 정지 후 Shift 유지 | 숨김 | 정지 | 진행 |
 
 Shift를 놓으면 화면이 돌아오고 기존 Tab 상태를 유지한다. 숨긴 동안에는 Tab 전환을 받지 않는다. 전역 `Time.timeScale = 0`은 기존 MainGame 게임오버에서만 사용한다.
+
+## 좌우 시선 조작
+
+`Base/Main Camera`에 `MainGameCameraLookController`를 미리 배치하고 같은 씬의 MiniGameManager를 연결한다. **Shift로 미니게임 화면을 숨긴 동안만** 화살표를 누르는 시간만큼 수평으로 부드럽게 회전한다. 왼쪽 키는 책상·모니터 방향, 오른쪽 키는 창문 방향이다. 두 키를 함께 누르거나 키를 놓으면 정지한다. 화면을 다시 올려도 마지막 시선을 유지하며, 전체 MainGame을 Retry할 때 최초 시선으로 돌아온다.
+
+Inspector에서 다음 항목을 조절한다.
+
+- `Left Yaw Offset`: 최초 카메라 회전으로부터 왼쪽 끝까지의 수평 각도(도). 현재 약 `-50.17`이며 책상·모니터 방향이다.
+- `Right Yaw Offset`: 오른쪽 끝까지의 수평 각도(도). 현재 약 `30.52`이며 창문 방향이다.
+- `Rotation Speed Degrees Per Second`: 좌우 공통 각속도(도/초). 현재 약 `66.89`로, 기존 책상 방향의 `50.17° / 0.75초` 속도를 유지한다. 왼쪽 끝까지 약 0.75초, 오른쪽 끝까지 약 0.46초가 걸리며 양끝 사이에서도 같은 각속도로 회전한다. 한계 각도를 바꿔도 속도는 유지된다.
+
+카메라 위치·최초 상하 각도·기울기·시야각과 Additive 미니게임 카메라는 유지한다. 창틀 전체를 보이게 하기 위한 자동 상향 회전과 FOV 보정은 제거했다. Tab 정지, 엄마 이벤트, 목숨과 누적 클리어 수도 이 컴포넌트의 책임이 아니다. 매니저의 Update와 Director의 발각 판정 뒤 LateUpdate에서 회전하며, 게임오버·목표 달성 뒤에는 시선 입력을 받지 않는다. 미니게임 교체 중에도 숨김 상태라면 조작할 수 있다. Inspector 각도는 현재 방 배치와 가로 화면을 기준으로 설정했다.
+
+PlayMode `MainGameCameraLookTests`는 실제 키의 좌우 방향·양끝 제한·각도 유지·수평 회전과 FOV 고정·좌우 및 정면 통과 시 각속도 일치·Tab 정지와 메인 시간·미니게임 교체·전체 재시작을 검증한다.
 
 PlayMode의 `MainGameMotherEventIntegrationTests`, `MainGameFootstepsEventTests`, `MainGameDeveloperToolsTests`, `MiniGamePauseIntegrationTests`가 시간·발각·재시작·숨김·개발자 버튼 조합을 검증한다. 앞의 세 테스트 묶음은 `MainGameEventIntegration` 카테고리로 함께 실행할 수 있다. 문 방문 전용 테스트에서는 실행 인스턴스의 가중치만 고정하고, 발소리 전용 테스트에서는 저장된 75:25 설정·가중치 경계·두 번 재생·1초 대기·안전성·취소를 검증한다. 목표 18회 달성 시 이벤트는 중단되지만 엔딩 화면은 별도 구현 영역이다.
