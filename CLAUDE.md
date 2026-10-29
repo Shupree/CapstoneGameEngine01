@@ -1,6 +1,6 @@
 # Claude 협업 작업 지침
 
-이 문서는 협업자의 Claude가 프로젝트를 수정할 때 지켜야 할 규칙과 기존 시스템의 연결 계약을 정리한다. **2026-10-22에 확인한 코드 기준**이다. 구현이 바뀌면 관련 설명도 함께 갱신한다.
+이 문서는 협업자의 Claude가 프로젝트를 수정할 때 지켜야 할 규칙과 기존 시스템의 연결 계약을 정리한다. **2026-10-29에 확인한 코드 기준**이다. 구현이 바뀌면 관련 설명도 함께 갱신한다.
 
 사용자의 최신 요청과 [AGENTS.md](AGENTS.md)를 먼저 확인한다. 작업 전 현재 코드와 씬의 실제 연결을 읽고, 이전 대화나 과거 문서만으로 구현 상태를 추정하지 않는다.
 
@@ -45,7 +45,7 @@ Lobby
 → Retry? 클릭: MainGame 전체 재생성
 ```
 
-- 기획상 미니게임 목표는 **18개**다. 현재 등록된 씬은 `MiniGame01`(스네이크), `MiniGame02`(Flappy), `MiniGame03`(Sorting)이며 각각 공통 컨트롤러가 연결되어 있다.
+- 기획상 미니게임 목표는 **18개**다. 현재 등록된 씬은 `MiniGame01`(스네이크), `MiniGame02`(Flappy), `MiniGame03`(Sorting), `MiniGame04`(Dino)이며 각각 공통 컨트롤러가 연결되어 있다.
 - 씬 목록은 계속 늘어날 수 있다. 과거의 두 씬 구성이나 MiniGame02가 빈 테스트 씬이라는 가정을 새 구현·테스트에 사용하지 않는다.
 - 현재 목표 판정은 **누적 18회 클리어**다. 선택 풀이 소진되면 다시 채우므로, 서로 다른 18개를 한 번씩 완료했는지 검사하는 구현은 아니다.
 - `OnGameEnding()`은 승리 로그와 `GameFinished` 알림을 보낸다. 엔딩 화면은 아직 없으며, 엄마의 문 방문·발각 이벤트는 구현되어 있다.
@@ -64,6 +64,7 @@ Lobby
 | `Assets/Scripts/MainGame/MotherDoorVisitEvent.cs` | 발걸음 → 문 열기 → 침대 관찰 → 퇴장 → 문 닫기의 순서와 발각 시간. |
 | `Assets/Scripts/MainGame/MotherActorController.cs` | Inspector 이동 지점을 따라 이동·회전하고 기존 Run을 감속한다. 이벤트 주기나 게임오버를 관리하지 않는다. |
 | `Assets/Scripts/MainGame/DoorController.cs` | 기존 경첩 회전과 Open/Close/IsOpen/IsClosed API. 입력과 발각 판정은 외부 책임이다. |
+| `Assets/Scripts/MainGame/MainGameDeveloperTools.cs` | Editor·Development Build 전용 텍스트 버튼 UI. 이벤트 즉시 실행과 지정 미니게임 로드를 매니저 API에 위임한다. |
 | `Assets/Scripts/MiniGames/Common` | `IMiniGame`, `MiniGameController`, 결과·상태 계약, 단독 실행용 UI. 변경 시 모든 미니게임에 미칠 영향을 확인한다. |
 | `Assets/Scripts/MiniGames/Snake` | 스네이크 규칙·로컬 실행·화면 표시. 전체 목숨이나 다음 씬을 직접 관리하지 않는다. |
 | `Assets/Scripts/MiniGames/Editor` | Editor 전용 씬 구성·검증 도구. 런타임 코드와 분리한다. |
@@ -179,6 +180,9 @@ MainGame
 
 ## 9. Unity 환경과 연결 문제
 
+- 개발자 도구는 MainGame의 `DeveloperToolsCanvas`에 미리 배치한다. 일반 빌드에서는 숨긴다. 강제 미니게임 교체는 목숨·클리어 수·엄마 이벤트를 보존하고 Space 시작 대기로 연다. 이벤트 즉시 실행은 기존 이벤트를 취소한 뒤 무작위 실행한다.
+- 이벤트 간격과 침대 관찰 시간의 Inspector 설정 위치·개발자 도구 동작은 [MainGame 가이드](Assets/Scripts/MainGame/README.md)를 따른다.
+
 - Editor 버전은 `ProjectSettings/ProjectVersion.txt`를 따른다. 현재 `6000.3.23f1`이다.
 - URP, New Input System, uGUI/TMP를 유지한다. 버전과 의존성은 `Packages/manifest.json` 및 `packages-lock.json`을 확인한다.
 - Editor가 열려 있고 Unity CLI/MCP를 사용할 수 있으면 실제 Editor를 통해 씬·프리팹을 편집하고 저장한다. 저장되지 않은 Editor 상태와 디스크 YAML을 서로 덮어쓰지 않는다.
@@ -203,6 +207,7 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 | PlayMode `MiniGamePauseIntegrationTests` | Tab 정지·재개, Shift 숨김과의 조합, 정지 UI 수명 |
 | PlayMode `MiniGameLivesIntegrationTests` | 목숨 차감·로컬 재시도·게임오버·전체 재시작·다른 패배 원인 |
 | PlayMode `MainGameMotherEventIntegrationTests` | 실제 소리 종료·문 시작 기준 시간, 침대 관찰·퇴장, 닫힘 중 발각, Tab 상태의 발각, 재시작·목표 달성 시 이벤트 수명 |
+| PlayMode `MainGameDeveloperToolsTests` | 저장된 버튼 클릭·Raycaster, 이벤트 취소·재실행, 지정 미니게임 Ready 전환·진행도 보존, 종료 시 차단, Inspector 시간 적용 |
 
 관련 기능을 수정한 경우 다음을 확인한다.
 

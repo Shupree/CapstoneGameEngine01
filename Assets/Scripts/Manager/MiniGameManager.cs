@@ -66,6 +66,8 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     public bool IsMiniGameActive => !string.IsNullOrEmpty(currentLoadedMiniGame);
     public bool IsMiniGameHidden => isMiniGameHidden;
     public bool IsMiniGamePaused => isMiniGamePaused;
+    // 개발자 UI는 전환 중 버튼을 잠그고 기존 비동기 씬 작업이 끝난 뒤 다시 요청합니다.
+    public bool IsTransitioning => isLoading || isRestarting;
 
     [Header("MiniGame Camera Viewport Settings")]
     [Tooltip("미니게임 카메라의 위치 및 크기 (X, Y: 위치 / W, H: 크기 비율 0~1)")]
@@ -263,6 +265,27 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         remainingMiniGames.RemoveAt(randomIndex);
 
         StartCoroutine(RoutineLoadMiniGame(selectedScene));
+    }
+
+    // 테스트용 지정 씬 교체입니다. 진행도·목숨·엄마 이벤트는 유지하고 새 컨트롤러의 Ready/Space 시작 흐름을 그대로 사용합니다.
+    public bool TryLoadMiniGameForDevelopment(string sceneName)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (!isActiveAndEnabled || isLoading || isGameOver || isRestarting || IsGameFinished) return false;
+        if (string.IsNullOrWhiteSpace(sceneName) || !miniGameSceneNames.Contains(sceneName) ||
+            !Application.CanStreamedLevelBeLoaded(sceneName))
+        {
+            Debug.LogWarning($"[Developer Tools] 등록되지 않았거나 로드할 수 없는 미니게임입니다: {sceneName}", this);
+            return false;
+        }
+        // 강제 선택도 이번 선택 풀에서 사용한 씬으로 처리하되 전체 풀이나 누적 기록은 초기화하지 않습니다.
+        remainingMiniGames.Remove(sceneName);
+        StartCoroutine(RoutineLoadMiniGame(sceneName));
+        return true;
+#else
+        // 일반 빌드에서는 UI 외부에서 메서드를 호출해도 테스트용 씬 전환을 수행하지 않습니다.
+        return false;
+#endif
     }
 
     // 실제 미니게임 씬 로딩 코루틴

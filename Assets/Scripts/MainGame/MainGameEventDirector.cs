@@ -7,8 +7,12 @@ public sealed class MainGameEventDirector : MonoBehaviour
     public enum DirectorState { Waiting, Running, Stopped }
 
     [SerializeField] private MiniGameManager miniGameManager;
+    [Header("Random Events")]
     [SerializeField] private List<MainGameEventBase> events = new List<MainGameEventBase>();
+    [Header("Next Event Delay (Seconds)")]
+    [Tooltip("이벤트가 완전히 종료된 뒤 다음 이벤트까지의 대기 시간입니다. X=최소, Y=최대이며 같으면 고정 시간입니다. 변경값은 다음 대기 예약부터 적용됩니다.")]
     [SerializeField] private Vector2 intervalSeconds = new Vector2(30f, 120f);
+    [Header("Runtime State (Read for debugging)")]
     [SerializeField] private DirectorState state;
     [SerializeField] private float secondsUntilNextEvent;
     private readonly List<MainGameEventBase> candidates = new List<MainGameEventBase>();
@@ -49,23 +53,42 @@ public sealed class MainGameEventDirector : MonoBehaviour
 
         secondsUntilNextEvent = Mathf.Max(0f, secondsUntilNextEvent - Time.deltaTime);
         if (secondsUntilNextEvent > 0f) return;
+        TryStartRandomEvent();
+    }
+
+    // 자동 예약과 개발자 도구가 같은 선택 경로를 사용합니다. 취소된 이벤트도 다른 후보와 같은 확률로 다시 선택될 수 있습니다.
+    private bool TryStartRandomEvent()
+    {
         candidates.Clear();
         foreach (var entry in events)
-            if (entry != null && entry.isActiveAndEnabled && entry.CanRun) candidates.Add(entry);
+            if (entry != null && entry.isActiveAndEnabled && !entry.IsRunning && entry.CanRun) candidates.Add(entry);
 
         if (candidates.Count == 0)
         {
             Debug.LogWarning("[MainGame Event] 실행 가능한 이벤트가 없어 다음 주기에 다시 확인합니다.", this);
             ScheduleNextEvent();
-            return;
+            return false;
         }
         activeEvent = candidates[Random.Range(0, candidates.Count)];
         state = DirectorState.Running;
+        secondsUntilNextEvent = 0f;
         if (!activeEvent.TryBegin())
         {
             activeEvent = null;
             ScheduleNextEvent();
+            return false;
         }
+        return true;
+    }
+
+    // 즉시 실행은 현재 연출을 먼저 취소합니다. 소리·엄마·문 정리는 각 이벤트의 Cancel 계약을 통해 수행합니다.
+    public bool TryRunNextEventImmediately()
+    {
+        if (!isActiveAndEnabled || miniGameManager == null || miniGameManager.IsGameOver || miniGameManager.IsGameFinished)
+            return false;
+        if (activeEvent != null) activeEvent.Cancel();
+        activeEvent = null;
+        return TryStartRandomEvent();
     }
 
     private void LateUpdate()
@@ -81,6 +104,13 @@ public sealed class MainGameEventDirector : MonoBehaviour
         float min = Mathf.Max(0f, intervalSeconds.x);
         secondsUntilNextEvent = Random.Range(min, Mathf.Max(min, intervalSeconds.y));
         state = DirectorState.Waiting;
+    }
+
+    // Inspector의 역전된 범위를 보정합니다. 이미 진행 중인 대기 시간은 즉시 실행 버튼으로 건너뛸 수 있습니다.
+    private void OnValidate()
+    {
+        intervalSeconds.x = Mathf.Max(0f, intervalSeconds.x);
+        intervalSeconds.y = Mathf.Max(intervalSeconds.x, intervalSeconds.y);
     }
 
     private void HandleGameOver(EGameOverReason reason) => StopEvents();

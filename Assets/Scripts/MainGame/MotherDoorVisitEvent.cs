@@ -16,6 +16,8 @@ public sealed class MotherDoorVisitEvent : MainGameEventBase
     [SerializeField] private Transform playerLookTarget;
     [SerializeField, Min(0f)] private float afterFootstepsDelay = 1f;
     [SerializeField, Min(0f)] private float detectionDelay = 1f;
+    [Header("Bedside Watch Duration (Seconds)")]
+    [Tooltip("침대 옆에 도착한 뒤 플레이어를 지켜보는 시간입니다. X=최소, Y=최대이며 같으면 고정 시간입니다. 이동 시간은 포함하지 않습니다.")]
     [SerializeField] private Vector2 watchSeconds = new Vector2(4f, 7f);
     [SerializeField] private VisitPhase phase;
     private float detectionStartsAt = float.PositiveInfinity;
@@ -80,5 +82,12 @@ public sealed class MotherDoorVisitEvent : MainGameEventBase
         if (path == null || path.Length == 0) return false;
         foreach (var point in path) if (point == null) return false;
         return true;
+    }
+
+    // Inspector에서 음수나 역전된 관찰 시간을 저장하지 않도록 보정합니다.
+    private void OnValidate()
+    {
+        watchSeconds.x = Mathf.Max(0f, watchSeconds.x);
+        watchSeconds.y = Mathf.Max(watchSeconds.x, watchSeconds.y);
     }
 }
