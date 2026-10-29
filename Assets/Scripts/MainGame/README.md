@@ -4,9 +4,10 @@
 
 ## 책임과 연결
 
-- `MainGameEventDirector`: 최초 진입 및 이벤트 완료 뒤 30~120초를 무작위로 기다린다. Inspector의 `Events` 목록에서 실행 가능한 항목 하나를 선택하며 중복 실행하지 않는다.
+- `MainGameEventDirector`: 최초 진입 및 이벤트 완료 뒤 30~120초를 무작위로 기다린다. Inspector의 `이벤트별 선택 가중치` 목록에서 실행 가능한 항목 하나를 가중치에 따라 선택하며 중복 실행하지 않는다.
 - `MainGameEventBase`: `CanRun`, `TryBegin()`, `IsRunning`, `IsDetectionActive`, `Cancel()`의 공통 계약이다. 개별 연출은 `ExecuteEvent()`, 취소 정리는 `OnCancelled()`에서 구현한다.
 - `MotherDoorVisitEvent`: 발걸음 재생, 문과 엄마의 방문 순서, 발각 구간을 관리한다.
+- `MotherFootstepsOnlyEvent`: 같은 발걸음을 끝까지 재생 → 1초 대기 → 같은 발걸음을 다시 끝까지 재생한다. 엄마와 문을 제어하지 않고 발각 판정은 항상 꺼져 있다.
 - `MotherActorController`: 모델의 이동·회전과 Animator의 `Speed`를 제어한다. 이동 중 기존 Run을 0.45배로 재생하고 관찰 중 Idle은 1배로 복원한다. Root Motion은 사용하지 않는다.
 - `DoorController`: 기존 문 회전 API를 재사용한다.
 - `MiniGameManager`: Shift 숨김 상태를 제공하고 게임오버·전체 재시작을 담당한다. `GameOverTriggered`와 `GameFinished`를 받으면 Director가 진행 중 이벤트와 다음 타이머를 취소한다.
@@ -29,6 +30,26 @@
 발각 구간은 **문 열기 시작 + 1초부터 문이 완전히 닫힐 때까지**다. 문 애니메이션 완료 후 1초를 세지 않는다. 엄마 모델이 이미 밖으로 나갔어도 문이 닫히는 중에 게임기를 표시하면 발각된다. 현재 판정은 기획상 시간 구간으로 처리하며 시야 Raycast를 사용하지 않는다.
 
 Director의 `LateUpdate`는 매니저가 `Update`에서 반영한 `IsMiniGameHidden`을 확인한다. Tab으로 정지한 화면도 보이면 발각된다. Shift를 누른 채 다음 미니게임으로 넘어가도 숨김 상태를 유지한다.
+
+## 이벤트 확률과 발소리 연출
+
+MainGame의 `MainGameEvents`를 선택하고 `MainGameEventDirector → 이벤트별 선택 가중치`에서 이벤트 참조와 가중치를 함께 설정한다.
+
+| 이벤트 | 가중치 | 현재 선택 확률 |
+| --- | ---: | ---: |
+| MotherDoorVisit | 75 | 75% |
+| MotherFootstepsOnly | 25 | 25% |
+
+- 가중치 합이 100이 아니어도 비율로 계산한다. 예를 들어 3과 1도 75%와 25%다. 변경은 다음 추첨부터 적용한다.
+- 가중치 0, 비활성, 필수 참조가 없는 이벤트는 선택에서 제외한다. 확률은 남은 유효 항목의 합을 기준으로 계산한다.
+- 기존 단순 `Events` 목록을 가진 씬은 참조를 기본 가중치 1로 한 번만 이전한다. 이미 설정된 새 목록의 가중치는 보존한다.
+- 자동 이벤트와 개발자 도구의 `다음 이벤트 즉시 실행`은 같은 확률 설정을 사용한다. 한 번 추첨할 때마다 독립적으로 선택하므로 짧은 실행 횟수에서 비율이 반드시 75:25로 맞지는 않는다.
+
+`MainGameEvents/MotherFootstepsOnly`에는 문 방문과 같은 `Step_Walk` 클립과 AudioSource 설정을 연결했다. 접근과 돌아가는 소리를 각각 원본 속도로 한 번 재생하며, 사이에 `Turnaround Delay` 1초를 기다린다. 실제 재생 종료를 기준으로 순서를 진행한다. 돌아가는 소리까지 끝난 뒤에야 다음 이벤트 대기를 예약한다.
+
+돌아가는 소리는 Unity의 `AudioSource.volume`과 `Retreat Volume Curve`로 점차 작아진다. 커브의 X는 재생 진행률(0~1), Y는 원래 음량에 곱하는 배율이다. 기본값은 1→0이며 Inspector에서 감쇠 모양을 조절할 수 있다. 오디오 DSP 시계를 사용하고 클립 속도와 재생 길이는 유지한다. 접근 소리는 원래 크기로 재생하고, 정상 종료·취소 뒤에는 Inspector에서 설정한 음량을 복원한다.
+
+이 이벤트는 게임기가 보이더라도 발각을 발생시키지 않는다. 엄마 모델과 Door_7의 활성 상태·위치·회전은 변경하지 않는다. 개발자 도구로 취소하거나 전체 게임이 종료되면 대기와 소리를 함께 정리한다.
 
 ## 씬에서 조절할 항목
 
@@ -65,7 +86,7 @@ MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. �
 2. `CanRun`에서 Inspector 필수 참조를 검사하고, `ExecuteEvent`에서 해당 연출이 완전히 끝날 때까지 기다린다.
 3. `IsDetectionActive`에 그 이벤트만의 발각 구간을 반환한다. 문이나 엄마가 없는 이벤트도 가능하며 항상 `false`인 연출도 등록할 수 있다.
 4. `OnCancelled`에서 소리·이동·문 등 해당 이벤트가 사용한 자원을 정리한다. 취소 시 성공·실패 결과를 새로 보내지 않는다.
-5. 씬에 배치하고 Director의 `Events` 목록에 연결한다. Director에 이벤트 타입별 분기문을 추가하지 않는다.
+5. 씬에 배치하고 Director의 `이벤트별 선택 가중치` 목록에 연결하고 비중을 설정한다. Director에 이벤트 타입별 분기문을 추가하지 않는다.
 
 창문 방문은 별도 이벤트에서 다른 이동 경로와 발각 구간을 정하고 `MotherActorController`를 재사용하면 된다. 같은 배우를 쓰는 이벤트도 Director가 하나씩 실행하므로 겹치지 않는다.
 
@@ -80,4 +101,4 @@ MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. �
 
 Shift를 놓으면 화면이 돌아오고 기존 Tab 상태를 유지한다. 숨긴 동안에는 Tab 전환을 받지 않는다. 전역 `Time.timeScale = 0`은 기존 MainGame 게임오버에서만 사용한다.
 
-PlayMode의 `MainGameMotherEventIntegrationTests`, `MainGameDeveloperToolsTests`, `MiniGamePauseIntegrationTests`가 시간·발각·재시작·숨김·개발자 버튼 조합을 검증한다. 목표 18회 달성 시 이벤트는 중단되지만 엔딩 화면은 별도 구현 영역이다.
+PlayMode의 `MainGameMotherEventIntegrationTests`, `MainGameFootstepsEventTests`, `MainGameDeveloperToolsTests`, `MiniGamePauseIntegrationTests`가 시간·발각·재시작·숨김·개발자 버튼 조합을 검증한다. 앞의 세 테스트 묶음은 `MainGameEventIntegration` 카테고리로 함께 실행할 수 있다. 문 방문 전용 테스트에서는 실행 인스턴스의 가중치만 고정하고, 발소리 전용 테스트에서는 저장된 75:25 설정·가중치 경계·두 번 재생·1초 대기·안전성·취소를 검증한다. 목표 18회 달성 시 이벤트는 중단되지만 엔딩 화면은 별도 구현 영역이다.

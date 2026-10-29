@@ -15,6 +15,7 @@ using Object = UnityEngine.Object;
 namespace GE.MiniGames.PlayModeTests
 {
     // 메인 어셈블리 경계를 유지한 채 저장된 씬·소리·문·배우와 실제 입력의 연결을 검증합니다.
+    [Category("MainGameEventIntegration")]
     public sealed class MainGameMotherEventIntegrationTests : InputTestFixture
     {
         private Keyboard keyboard;
@@ -60,6 +61,8 @@ namespace GE.MiniGames.PlayModeTests
             manager = Find("MiniGameManager");
             director = Find("MainGameEventDirector");
             visit = Find("MotherDoorVisitEvent");
+            // 이 묶음은 문 방문 연출을 검증합니다. 제품의 무작위 확률 때문에 다른 연출을 기다리지 않게 합니다.
+            MainGameTestEvents.UseOnly(director, visit);
             actor = Find("MotherActorController");
             door = Find("DoorController");
             Assert.That(director, Is.Not.Null);

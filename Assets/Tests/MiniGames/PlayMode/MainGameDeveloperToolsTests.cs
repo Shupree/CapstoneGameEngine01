@@ -15,6 +15,7 @@ using Object = UnityEngine.Object;
 namespace GE.MiniGames.PlayModeTests
 {
     // 저장된 버튼의 클릭 연결과 실제 Additive 전환을 검증합니다. 메인 타입은 기존 어셈블리에 유지합니다.
+    [Category("MainGameEventIntegration")]
     public sealed class MainGameDeveloperToolsTests : InputTestFixture
     {
         private MonoBehaviour manager, director, visit, tools;
@@ -57,6 +58,8 @@ namespace GE.MiniGames.PlayModeTests
             manager = Find("MiniGameManager");
             director = Find("MainGameEventDirector");
             visit = Find("MotherDoorVisitEvent");
+            // 버튼 교체·문 방문 취소의 기존 검증은 문 이벤트를 고정하고, 확률 자체는 전용 테스트에서 확인합니다.
+            MainGameTestEvents.UseOnly(director, visit);
             tools = Find("MainGameDeveloperTools");
             Assert.That(tools, Is.Not.Null, "저장된 MainGame에 개발자 도구가 필요합니다.");
             yield return WaitFor(() => !Property<bool>(manager, "IsTransitioning"));

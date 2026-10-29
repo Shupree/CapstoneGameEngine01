@@ -59,9 +59,10 @@ Lobby
 | `Assets/Scripts/Manager/MiniGameManager.cs` | Additive 씬 관리, 클리어 집계, 목숨, MainGame의 Tab·Shift 입력, 게임오버·전체 재시작. |
 | `Assets/Scripts/Utilities/SingletonMono.cs` | 싱글턴 생성·중복 방지·수명 관리. 상속 클래스의 `Awake`와 `OnDestroy`에서 기존 기본 처리를 보존한다. |
 | `Assets/Scripts/Commons/ComEnum.cs` | `ESceneType`, 확장 가능한 패배 원인 `EGameOverReason`. |
-| `Assets/Scripts/MainGame/MainGameEventDirector.cs` | 이벤트 완료 뒤 30~120초 대기, 등록된 이벤트 선택, 동시 실행 방지, 숨김 상태 기반 공통 발각 판정. 씬 수명에 종속된다. |
+| `Assets/Scripts/MainGame/MainGameEventDirector.cs` | 이벤트 완료 뒤 30~120초 대기, Inspector의 이벤트·가중치 목록으로 선택, 동시 실행 방지, 숨김 상태 기반 공통 발각 판정. 씬 수명에 종속된다. |
 | `Assets/Scripts/MainGame/MainGameEventBase.cs` | 개별 이벤트의 실행·완료·취소·발각 구간 계약. 새로운 이벤트는 이 타입을 상속해 Director 목록에 등록한다. |
 | `Assets/Scripts/MainGame/MotherDoorVisitEvent.cs` | 발걸음 → 문 열기 → 침대 관찰 → 퇴장 → 문 닫기의 순서와 발각 시간. |
+| `Assets/Scripts/MainGame/MotherFootstepsOnlyEvent.cs` | 접근 발소리 → 1초 대기 → 돌아가는 발소리. 문·엄마를 제어하지 않고 발각 판정은 항상 false다. |
 | `Assets/Scripts/MainGame/MotherActorController.cs` | Inspector 이동 지점을 따라 이동·회전하고 기존 Run을 감속한다. 이벤트 주기나 게임오버를 관리하지 않는다. |
 | `Assets/Scripts/MainGame/DoorController.cs` | 기존 경첩 회전과 Open/Close/IsOpen/IsClosed API. 입력과 발각 판정은 외부 책임이다. |
 | `Assets/Scripts/MainGame/MainGameDeveloperTools.cs` | Editor·Development Build 전용 텍스트 버튼 UI. 이벤트 즉시 실행과 지정 미니게임 로드를 매니저 API에 위임한다. |
@@ -182,6 +183,7 @@ MainGame
 
 - 개발자 도구는 MainGame의 `DeveloperToolsCanvas`에 미리 배치한다. 일반 빌드에서는 숨긴다. 강제 미니게임 교체는 목숨·클리어 수·엄마 이벤트를 보존하고 Space 시작 대기로 연다. 이벤트 즉시 실행은 기존 이벤트를 취소한 뒤 무작위 실행한다.
 - 이벤트 간격과 침대 관찰 시간의 Inspector 설정 위치·개발자 도구 동작은 [MainGame 가이드](Assets/Scripts/MainGame/README.md)를 따른다.
+- 현재 이벤트 가중치는 문 방문 75, 발소리만 25다. Director의 `eventEntries` 목록에서 함께 관리한다. 0/비활성/실행 불가능 항목을 제외한 비율로 선택하며, 기존 `events` 참조 목록은 자동 이전용 숨김 필드로 보존한다. 새 이벤트를 하드코딩 분기로 선택하지 않는다.
 
 - Editor 버전은 `ProjectSettings/ProjectVersion.txt`를 따른다. 현재 `6000.3.23f1`이다.
 - URP, New Input System, uGUI/TMP를 유지한다. 버전과 의존성은 `Packages/manifest.json` 및 `packages-lock.json`을 확인한다.
@@ -207,6 +209,7 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 | PlayMode `MiniGamePauseIntegrationTests` | Tab 정지·재개, Shift 숨김과의 조합, 정지 UI 수명 |
 | PlayMode `MiniGameLivesIntegrationTests` | 목숨 차감·로컬 재시도·게임오버·전체 재시작·다른 패배 원인 |
 | PlayMode `MainGameMotherEventIntegrationTests` | 실제 소리 종료·문 시작 기준 시간, 침대 관찰·퇴장, 닫힘 중 발각, Tab 상태의 발각, 재시작·목표 달성 시 이벤트 수명 |
+| PlayMode `MainGameFootstepsEventTests` | 75:25 가중치 경계·0/비활성 제외·기존 참조 이전, 원본 소리 두 번 재생·1초 대기·무발각·문/엄마 정지·취소 |
 | PlayMode `MainGameDeveloperToolsTests` | 저장된 버튼 클릭·Raycaster, 이벤트 취소·재실행, 지정 미니게임 Ready 전환·진행도 보존, 종료 시 차단, Inspector 시간 적용 |
 
 관련 기능을 수정한 경우 다음을 확인한다.
