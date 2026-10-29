@@ -37,6 +37,17 @@ namespace GE.MiniGames.Snake
 
         internal override void OnGameInput(GameButtons pressed)
         {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // DEV_CLEAR_CHEAT: 개발용 Z+X+C 성공 스킵. 출시 시 이 #if~#endif 블록만 삭제하면 됩니다.
+            // 공통 성공 이벤트를 사용하며, 새 눌림만 받아 다음 게임의 연속 스킵을 막습니다.
+            var keys = UnityEngine.InputSystem.Keyboard.current;
+            if (KeyboardInputEnabled && keys != null && keys.zKey.isPressed && keys.xKey.isPressed && keys.cKey.isPressed
+                && (keys.zKey.wasPressedThisFrame || keys.xKey.wasPressedThisFrame || keys.cKey.wasPressedThisFrame))
+            {
+                Finish(MiniGameOutcome.Success, "DEV CLEAR (ZXC)");
+                return;
+            }
+#endif
             // 같은 프레임에 여러 방향을 누르면 W→A→S→D 우선순위로 한 방향만 예약합니다.
             if ((pressed & GameButtons.W) != 0) Model.QueueDirection(Vector2Int.up);
             else if ((pressed & GameButtons.A) != 0) Model.QueueDirection(Vector2Int.left);
