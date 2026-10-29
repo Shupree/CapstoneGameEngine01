@@ -11,6 +11,10 @@ namespace GE.MiniGames.FlappyBird
         public float gravity = 14f;
         public float flapSpeed = 4.8f;
         public float pipeSpeed = 2.8f;
+        // 하강을 빠르게 하는 중력과 전진을 표현하는 파이프 이동 속도를 30% 높입니다.
+        // 씬의 기준값은 유지하고 계산값만 사용하므로 재시도/OnValidate 때 배율이 누적되지 않습니다.
+        public float Gravity => gravity * 1.3f;
+        public float PipeSpeed => pipeSpeed * 1.3f;
         public float pipeSpacing = 3.8f;
         // 씬에는 기존 기준 간격을 보관하고 생성 시에만 두 배를 적용합니다. 재시도/OnValidate에서 누적되지 않습니다.
         public float PipeSpacing => pipeSpacing * 2f;
@@ -102,10 +106,11 @@ namespace GE.MiniGames.FlappyBird
         {
             float oldY = BirdY;
             float oldVelocity = Velocity;
-            BirdY += Velocity * dt - 0.5f * Rules.gravity * dt * dt;
-            Velocity -= Rules.gravity * dt;
+            // 실제 이동과 아래의 연속 충돌 계산에 같은 보정 중력을 적용합니다.
+            BirdY += Velocity * dt - 0.5f * Rules.Gravity * dt * dt;
+            Velocity -= Rules.Gravity * dt;
             float peak = oldVelocity > 0f && Velocity < 0f
-                ? oldY + oldVelocity * oldVelocity / (2f * Rules.gravity) : Mathf.Max(oldY, BirdY);
+                ? oldY + oldVelocity * oldVelocity / (2f * Rules.Gravity) : Mathf.Max(oldY, BirdY);
             if (Mathf.Min(oldY, BirdY) - BirdHalfSize.y <= -FlappyRules.Height / 2f ||
                 peak + BirdHalfSize.y >= FlappyRules.Height / 2f)
             { Result = FlappyStep.BoundaryCollision; return; }
@@ -113,7 +118,7 @@ namespace GE.MiniGames.FlappyBird
             foreach (var pipe in pipes)
             {
                 float oldX = pipe.X;
-                pipe.X -= Rules.pipeSpeed * dt;
+                pipe.X -= Rules.PipeSpeed * dt;
                 if (HitsPipe(pipe, pipe.LowerWidth, false, oldX, oldY, oldVelocity, dt) ||
                     HitsPipe(pipe, pipe.UpperWidth, true, oldX, oldY, oldVelocity, dt))
                 { Result = FlappyStep.PipeCollision; return; }
@@ -130,14 +135,14 @@ namespace GE.MiniGames.FlappyBird
         {
             float extent = width / 2f + BirdHalfSize.x;
             if (oldX + extent < FlappyRules.BirdX || pipe.X - extent > FlappyRules.BirdX) return false;
-            float enter = Mathf.Clamp01((oldX - FlappyRules.BirdX - extent) / (Rules.pipeSpeed * dt));
-            float leave = Mathf.Clamp01((oldX - FlappyRules.BirdX + extent) / (Rules.pipeSpeed * dt));
-            float y1 = oldY + oldVelocity * dt * enter - 0.5f * Rules.gravity * dt * dt * enter * enter;
-            float y2 = oldY + oldVelocity * dt * leave - 0.5f * Rules.gravity * dt * dt * leave * leave;
+            float enter = Mathf.Clamp01((oldX - FlappyRules.BirdX - extent) / (Rules.PipeSpeed * dt));
+            float leave = Mathf.Clamp01((oldX - FlappyRules.BirdX + extent) / (Rules.PipeSpeed * dt));
+            float y1 = oldY + oldVelocity * dt * enter - 0.5f * Rules.Gravity * dt * dt * enter * enter;
+            float y2 = oldY + oldVelocity * dt * leave - 0.5f * Rules.Gravity * dt * dt * leave * leave;
             if (!upper) return Mathf.Min(y1, y2) - BirdHalfSize.y <= pipe.GapY - Rules.gapHeight / 2f;
             float maxY = Mathf.Max(y1, y2);
-            float apexT = oldVelocity / Rules.gravity / dt;
-            if (apexT >= enter && apexT <= leave) maxY = Mathf.Max(maxY, oldY + oldVelocity * oldVelocity / (2f * Rules.gravity));
+            float apexT = oldVelocity / Rules.Gravity / dt;
+            if (apexT >= enter && apexT <= leave) maxY = Mathf.Max(maxY, oldY + oldVelocity * oldVelocity / (2f * Rules.Gravity));
             return maxY + BirdHalfSize.y >= pipe.GapY + Rules.gapHeight / 2f;
         }
     }
