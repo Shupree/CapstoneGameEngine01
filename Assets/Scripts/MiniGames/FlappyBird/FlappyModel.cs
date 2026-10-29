@@ -12,6 +12,8 @@ namespace GE.MiniGames.FlappyBird
         public float flapSpeed = 4.8f;
         public float pipeSpeed = 2.8f;
         public float pipeSpacing = 3.8f;
+        // 씬에는 기존 기준 간격을 보관하고 생성 시에만 두 배를 적용합니다. 재시도/OnValidate에서 누적되지 않습니다.
+        public float PipeSpacing => pipeSpacing * 2f;
         public float gapHeight = 3.2f;
         public float pipeWidth = 0.9f;
         public float firstPipeX = 6f;
@@ -19,6 +21,8 @@ namespace GE.MiniGames.FlappyBird
         public const int Goal = 15;
         public const float Width = 16f, Height = 9f, BirdX = -3.5f;
         public const float BirdHalfWidth = 0.3f, BirdHalfHeight = 0.24f;
+        // 스프라이트 유무와 관계없이 표시와 판정의 가로·세로를 모두 30% 줄입니다.
+        public const float BirdSizeScale = 0.7f;
 
         // Inspector 입력을 안전한 범위로 한정하고 실행별 복사본을 사용합니다.
         public FlappyRules ValidatedCopy()
@@ -57,7 +61,7 @@ namespace GE.MiniGames.FlappyBird
         public float Velocity { get; private set; }
         public int Passed { get; private set; }
         public FlappyStep Result { get; private set; }
-        public Vector2 BirdHalfSize { get; internal set; } = new Vector2(FlappyRules.BirdHalfWidth, FlappyRules.BirdHalfHeight);
+        public Vector2 BirdHalfSize { get; internal set; } = new Vector2(FlappyRules.BirdHalfWidth, FlappyRules.BirdHalfHeight) * FlappyRules.BirdSizeScale;
 
         public FlappyModel(FlappyRules rules)
         {
@@ -65,11 +69,13 @@ namespace GE.MiniGames.FlappyBird
             Pipes = pipes.AsReadOnly();
             var random = Rules.randomSeed < 0 ? new System.Random() : new System.Random(Rules.randomSeed);
             float gap = 0f;
+            // 통과 공간과 화면 끝 사이에 최소 0.25만 남기고, 가능한 높이 범위 전체를 사용합니다.
+            float maxGapOffset = (FlappyRules.Height - Rules.gapHeight) * 0.5f - 0.25f;
             for (int i = 0; i < FlappyRules.Goal; i++)
             {
-                // 첫 파이프는 중앙에 두고 다음 높이 변화는 제한해 갑작스러운 난이도 급증을 피합니다.
-                if (i > 0) gap = Mathf.Clamp(gap + (float)(random.NextDouble() * 1.8 - 0.9), -1.6f, 1.6f);
-                pipes.Add(new FlappyPipe { X = Rules.firstPipeX + i * Rules.pipeSpacing, GapY = gap,
+                // 첫 쌍은 중앙, 이후는 이전 높이와 독립적으로 추첨해 비슷한 높이로 몰리는 경향을 줄입니다.
+                if (i > 0) gap = Mathf.Lerp(-maxGapOffset, maxGapOffset, (float)random.NextDouble());
+                pipes.Add(new FlappyPipe { X = Rules.firstPipeX + i * Rules.PipeSpacing, GapY = gap,
                     LowerWidth = Rules.pipeWidth, UpperWidth = Rules.pipeWidth });
             }
             Velocity = Rules.flapSpeed;

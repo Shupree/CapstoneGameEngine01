@@ -12,8 +12,9 @@ namespace GE.MiniGames.Cross
         public override string GameId => "MiniGame05";
         public override int Progress => Model?.CrossedLanes ?? 0;
         public override int Target => CrossModel.RoadRows;
+        // 공통 시작 화면은 이 안내를 읽으므로 기존 씬의 문자열을 다시 저장할 필요가 없습니다.
         public override string StartInstructions =>
-            "W / SPACE  앞으로    A / D  좌우    S  뒤로\n차량을 피해 10개 차선을 건너세요.\n맨 위 안전지대 도착 시 성공!\nTAB  일시정지 · 재개";
+            "W / SPACE  앞으로    A / D  좌우    S  뒤로\n차량을 피해 25개 차선을 건너세요.\n5 / 15: 안전지대\nTAB  일시정지 · 재개";
 
         // 시도마다 출발 위치와 모든 차선을 초기화합니다. 목숨은 기존 메인 시스템에서 관리합니다.
         protected override void OnResetGame() { Model = new CrossModel(randomSeed < 0 ? (int?)null : randomSeed); }

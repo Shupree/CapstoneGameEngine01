@@ -19,16 +19,19 @@ namespace GE.MiniGames.Dino
         {
             var random = rules.randomSeed < 0 ? new System.Random() : new System.Random(rules.randomSeed);
             var result = new List<DinoObstacle>();
+            // 후반 가속으로 착지 전에 다음 점프가 강제되지 않도록 최소 간격만 최고 속도 기준으로 확보합니다.
+            var fastest = rules.ValidatedCopy();
+            fastest.speed = rules.MaximumSpeed;
             var current = Pick(random, rules, DinoObstacleKind.Cactus);
             current.CourseX = rules.DinosaurFront + rules.speed * rules.firstArrivalSeconds;
             while (current.CourseX + rules.Size(current.Kind, current.Variant).x <=
-                rules.DinosaurFront + rules.goalDistance - Mathf.Max(rules.finishClearance, rules.speed * (rules.FlightTime + rules.landingBuffer)))
+                rules.DinosaurFront + rules.GoalDistance - Mathf.Max(rules.finishClearance, fastest.speed * (rules.FlightTime + rules.landingBuffer)))
             {
                 result.Add(current);
                 var next = Pick(random, rules, (DinoObstacleKind)random.Next(4));
                 float interval = SampleInterval(random, rules);
-                // 값 조정으로 체공 시간이 길어졌을 때 해당 조합에 필요한 간격만 보정합니다.
-                next.CourseX = current.CourseX + rules.speed * Mathf.Max(interval, MinimumInterval(rules, current, next));
+                // 무작위 간격은 기존 기준을 유지하고, 가속 후에도 필요한 점프·착지 여유보다 좁아지지 않게 합니다.
+                next.CourseX = current.CourseX + Mathf.Max(rules.speed * interval, fastest.speed * MinimumInterval(fastest, current, next));
                 current = next;
             }
             return result;

@@ -16,8 +16,9 @@ namespace GE.MiniGames.Dino
         public double Elapsed { get; private set; }
         public DinoStep Result { get; private set; }
         public bool Grounded => Height == 0;
-        public float Progress01 => Mathf.Clamp01(Distance / Rules.goalDistance);
-        public float FlagX => Rules.dinosaurLeft + Rules.dinosaurSize.x * 0.5f + Rules.goalDistance - Distance;
+        public float Progress01 => Mathf.Clamp01(Distance / Rules.GoalDistance);
+        public float CurrentSpeed => Rules.SpeedAtDistance(Distance);
+        public float FlagX => Rules.dinosaurLeft + Rules.dinosaurSize.x * 0.5f + Rules.GoalDistance - Distance;
         public int AnimationFrame => (int)(Elapsed * Rules.animationFps);
         private readonly DinoArt art;
         private readonly DinoPhysics.Actor dinosaur;
@@ -50,10 +51,12 @@ namespace GE.MiniGames.Dino
             if (disposed || Result != DinoStep.Running) return Result;
             while (seconds > 0 && Result == DinoStep.Running)
             {
-                float dt = Mathf.Min(seconds, 1f / 240f, (Rules.goalDistance - Distance) / Rules.speed);
-                if (dt <= 0) { Distance = Rules.goalDistance; Result = DinoStep.Success; break; }
+                // 고정 속도×전체 시간이 아닌 현재 속도를 적분합니다. 장애물·지면·깃발은 같은 누적 거리를 사용합니다.
+                float speed = CurrentSpeed;
+                float dt = Mathf.Min(seconds, 1f / 240f, (Rules.GoalDistance - Distance) / speed);
+                if (dt <= 0) { Distance = Rules.GoalDistance; Result = DinoStep.Success; break; }
                 seconds -= dt; Elapsed += dt;
-                Distance = Mathf.Min(Rules.goalDistance, (float)(Elapsed * Rules.speed));
+                Distance = Mathf.Min(Rules.GoalDistance, Distance + speed * dt);
                 if (Velocity != 0 || Height > 0)
                 {
                     Height += Velocity * dt - Rules.gravity * dt * dt * 0.5f;
@@ -81,8 +84,8 @@ namespace GE.MiniGames.Dino
                     if (obstacles[i] != null && ObstacleX(i) <= Rules.DinosaurFront &&
                         ObstacleX(i) + Rules.Size(Course[i].Kind, Course[i].Variant).x >= Rules.dinosaurLeft && dinosaur.Touches(obstacles[i]))
                     { Result = DinoStep.Collision; break; }
-                if (Result == DinoStep.Running && Distance >= Rules.goalDistance)
-                { Distance = Rules.goalDistance; Result = DinoStep.Success; }
+                if (Result == DinoStep.Running && Distance >= Rules.GoalDistance)
+                { Distance = Rules.GoalDistance; Result = DinoStep.Success; }
             }
             return Result;
         }

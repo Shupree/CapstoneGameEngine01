@@ -96,7 +96,8 @@ namespace GE.MiniGames.Editor
             Text("Index", content, font, "MINI GAME  /  01", new Vector2(-215, 334), new Vector2(360, 32), 18, Mint, TextAlignmentOptions.Left);
             Text("Mode", content, font, "1 PLAYER", new Vector2(284, 334), new Vector2(220, 32), 18, Mint, TextAlignmentOptions.Right);
             Text("Title", content, font, "S N A K E", new Vector2(-140, 290), new Vector2(510, 52), 40, Paper, TextAlignmentOptions.Left);
-            TMP_Text progress = Text("Progress", content, font, "사과  0 / 5", new Vector2(285, 290), new Vector2(220, 42), 25, Paper, TextAlignmentOptions.Right);
+            // 새 씬의 안내도 게임의 목표값을 사용해 사과 개수를 중복 관리하지 않습니다.
+            TMP_Text progress = Text("Progress", content, font, $"사과  0 / {game.Target}", new Vector2(285, 290), new Vector2(220, 42), 25, Paper, TextAlignmentOptions.Right);
             Image track = Panel("Progress track", content, new Vector2(0, 247), new Vector2(790, 8), new Color32(41, 67, 59, 255));
             Image fill = Panel("Progress fill", track.transform, Vector2.zero, Vector2.zero, Mint);
             Stretch(fill.rectTransform);
@@ -105,7 +106,7 @@ namespace GE.MiniGames.Editor
             Image board = Panel("Board", content, new Vector2(0, -22), new Vector2(504, 504), Ink);
             RectTransform cells = Rect("Cells", board.transform, Vector2.zero, new Vector2(500, 500));
             Text("Controls", content, font, "W A S D  방향 전환     |     Tab  일시정지", new Vector2(0, -310), new Vector2(840, 36), 22, Paper);
-            TMP_Text rulesLabel = Text("Goal", content, font, "10 × 10    /    사과 5개를 모으세요    /    0.25초마다 이동", new Vector2(0, -347), new Vector2(920, 28), 18, Mint);
+            TMP_Text rulesLabel = Text("Goal", content, font, $"10 × 10    /    사과 {game.Target}개를 모으세요    /    0.25초마다 이동", new Vector2(0, -347), new Vector2(920, 28), 18, Mint);
             SnakeView view = controllerRoot.AddComponent<SnakeView>();
             view.Configure(game, cells, progress, fill);
             view.ConfigureRulesLabel(rulesLabel);
@@ -118,7 +119,7 @@ namespace GE.MiniGames.Editor
             Panel("Modal border", overlay.transform, Vector2.zero, new Vector2(612, 352), Mint);
             Image modal = Panel("Modal", overlay.transform, Vector2.zero, new Vector2(604, 344), Ink);
             TMP_Text heading = Text("State title", modal.transform, font, "스네이크", new Vector2(0, 113), new Vector2(560, 64), 43, Paper);
-            TMP_Text body = Text("Instructions", modal.transform, font, "WASD  방향 전환\n사과 5개를 먹으면 성공!\n벽과 자신의 몸을 피하세요.", new Vector2(0, 10), new Vector2(558, 138), 25, Paper);
+            TMP_Text body = Text("Instructions", modal.transform, font, game.StartInstructions, new Vector2(0, 10), new Vector2(558, 138), 25, Paper);
             TMP_Text hint = Text("Prompt", modal.transform, font, "Spacebar로 시작", new Vector2(0, -112), new Vector2(562, 44), 22, Mint);
             var testUI = controllerRoot.AddComponent<MiniGameTestUI>();
             testUI.Configure(game, overlay.gameObject, heading, body, hint, body.text);

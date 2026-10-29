@@ -59,17 +59,18 @@ namespace GE.MiniGames.Editor
             var content = Rect("Content", canvasRoot, Vector2.zero, new Vector2(600, 800));
             Label("Index", content, font, "MINI GAME / 05", new Vector2(-130, 364), new Vector2(240, 24), 15, Road, TextAlignmentOptions.Left);
             Label("Title", content, font, "CROSS THE STREET", new Vector2(-60, 327), new Vector2(380, 40), 28, Ink, TextAlignmentOptions.Left);
-            var counter = Label("Crossed lanes", content, font, "00 / 10", new Vector2(192, 327), new Vector2(116, 40), 24, Teal, TextAlignmentOptions.Right);
+            // 목표 표기는 모델과 공유합니다. 화면 창은 500×600으로 두고 긴 코스는 CrossView가 구성합니다.
+            var counter = Label("Crossed lanes", content, font, $"00 / {game.Target}", new Vector2(192, 327), new Vector2(116, 40), 24, Teal, TextAlignmentOptions.Right);
             var track = Panel("Progress track", content, new Vector2(0, 297), new Vector2(500, 4), new Color32(226, 232, 240, 255));
             var fill = Panel("Progress fill", track.transform, Vector2.zero, Vector2.zero, Teal).rectTransform;
             fill.anchorMin = Vector2.zero; fill.anchorMax = new Vector2(0, 1); fill.offsetMin = fill.offsetMax = Vector2.zero;
 
-            // 원본의 500×600 보드와 실제 크기를 유지하고 CanvasScaler에서만 비율을 조정합니다.
+            // 기존 크기의 표시 창과 재사용할 배경 원본입니다. 전체 코스는 이 창의 마스크 안에서 세로로 이동합니다.
             var field = Panel("Playfield 500 x 600", content, new Vector2(0, -15), new Vector2(500, 600), Road).rectTransform;
             field.gameObject.AddComponent<RectMask2D>();
             Panel("Goal safe zone - row 0", field, new Vector2(0, 275), new Vector2(500, 50), Mint);
             Panel("Start safe zone - row 11", field, new Vector2(0, -275), new Vector2(500, 50), new Color32(226, 232, 240, 255));
-            for (int row = 2; row <= CrossModel.RoadRows; row++)
+            for (int row = 2; row <= 10; row++)
             {
                 var divider = Rect("Lane divider " + row, field, new Vector2(0, 300 - row * 50), new Vector2(500, 2));
                 for (int x = 0; x < 500; x += 30)
@@ -85,7 +86,7 @@ namespace GE.MiniGames.Editor
             var player = Panel("Player - replaceable sprite", field, Vector2.zero, new Vector2(36, 36), Ink);
             player.sprite = rounded; player.type = Image.Type.Sliced;
             Label("Controls", content, font, "W / SPACE  전진     A S D  이동", new Vector2(0, -347), new Vector2(550, 30), 20, Ink);
-            Label("Goal", content, font, "10개 차선 건너기   /   TAB  일시정지", new Vector2(0, -378), new Vector2(550, 26), 17, Teal);
+            Label("Goal", content, font, $"{game.Target}개 차선 건너기   /   TAB  일시정지", new Vector2(0, -378), new Vector2(550, 26), 17, Teal);
 
             var overlay = Panel("Common state overlay", field, Vector2.zero, new Vector2(500, 600), new Color(.886f, .91f, .94f, .96f));
             var title = Label("State title", overlay.transform, font, "길 건너기", new Vector2(0, 130), new Vector2(460, 70), 36, Ink);

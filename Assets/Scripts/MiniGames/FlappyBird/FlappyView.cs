@@ -23,7 +23,7 @@ namespace GE.MiniGames.FlappyBird
         private bool previousSpace, spaceArmed;
         private int stateFrame;
         private const float Scale = 60f;
-        // 모델 좌표의 Scale과 별개로, 모든 그림의 원본 픽셀을 동일한 UI 배율로 표시합니다.
+        // 배경·해초의 원본 배율입니다. 플레이어는 이 배율에 BirdSizeScale을 곱해 별도로 축소합니다.
         private const float SpriteScale = 1.8f;
 
         // 기본 참조는 씬 제작 시 연결하고, 수중 스프라이트와 반복 배경은 씬 Inspector에 저장합니다.
@@ -72,7 +72,8 @@ namespace GE.MiniGames.FlappyBird
                 RefreshBackground(model);
                 bird.sprite = birdSprite;
                 bird.color = birdSprite == null ? new Color32(255, 215, 75, 255) : Color.white;
-                if (birdSprite != null) bird.rectTransform.sizeDelta = birdSprite.rect.size * SpriteScale;
+                // 원본 유무에 관계없이 모델의 축소된 판정 크기를 그대로 표시합니다.
+                bird.rectTransform.sizeDelta = model.BirdHalfSize * (2f * Scale);
                 bird.rectTransform.anchoredPosition = new Vector2(FlappyRules.BirdX, model.BirdY) * Scale;
                 for (int i = 0; i < model.Pipes.Count; i++)
                 {
@@ -113,7 +114,7 @@ namespace GE.MiniGames.FlappyBird
             float tileHeight = texture.height * SpriteScale;
             float distance = (model.Rules.firstPipeX - model.Pipes[0].X) * Scale * backgroundParallax;
             // U 좌표를 증가시키면 무늬가 왼쪽으로 흐릅니다. 화면 폭에 맞춰 늘리는 대신
-            // 원본의 1.8배 크기로 반복하므로 물고기·해초와 배경의 도트 크기가 같습니다.
+            // 배경은 원본의 1.8배 크기로 반복해 해초의 도트 배율을 유지합니다.
             flowingBackground.uvRect = new Rect(Mathf.Repeat(distance / tileWidth, 1f), 0f,
                 viewport.width / tileWidth, viewport.height / tileHeight);
         }
@@ -150,11 +151,11 @@ namespace GE.MiniGames.FlappyBird
             image.rectTransform.localScale = new Vector3(1f, upper ? -1f : 1f, 1f);
         }
 
-        // FlappyGame이 모델을 만든 직후 호출합니다. 확대된 물고기와 해초의 표시 크기를
+        // FlappyGame이 모델을 만든 직후 호출합니다. 축소된 물고기와 기존 해초의 표시 크기를
         // 게임 단위로 넘겨, 보이는 그림을 통과하거나 점수를 너무 일찍 얻지 않도록 합니다.
         internal void ConfigureVisualBounds(FlappyModel model)
         {
-            if (birdSprite != null) model.BirdHalfSize = birdSprite.rect.size * (SpriteScale / Scale * 0.5f);
+            if (birdSprite != null) model.BirdHalfSize = birdSprite.rect.size * (SpriteScale * FlappyRules.BirdSizeScale / Scale * 0.5f);
             foreach (var pipe in model.Pipes)
             {
                 float bottomHeight = FlappyRules.Height * 0.5f + pipe.GapY - model.Rules.gapHeight * 0.5f;

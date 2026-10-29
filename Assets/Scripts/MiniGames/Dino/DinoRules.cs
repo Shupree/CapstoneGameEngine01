@@ -16,6 +16,11 @@ namespace GE.MiniGames.Dino
         [Min(1)] public float speed = 299;
         [Min(1)] public float jumpSpeed = 600, gravity = 1800;
         [Min(1)] public float goalDistance = 8000;
+        // 씬의 기준 거리 8000을 유지하고 실제 목표만 1.5배로 계산해 재시도 시 중복 적용을 막습니다.
+        public float GoalDistance => goalDistance * 1.5f;
+        // 진행률에 따라 출발 속도에서 최대 30%까지 서서히 빨라집니다. 재시도는 거리 0부터 다시 시작합니다.
+        public float MaximumSpeed => speed * 1.3f;
+        public float SpeedAtDistance(float distance) => Mathf.Lerp(speed, MaximumSpeed, Mathf.Clamp01(distance / GoalDistance));
         [Min(0)] public float firstArrivalSeconds = 2.5f;
         public Vector2[] cactusSizes = { new Vector2(26, 40), new Vector2(32, 48), new Vector2(38, 56) };
         public Vector2[] rockSizes = { new Vector2(50, 28), new Vector2(62, 32) };

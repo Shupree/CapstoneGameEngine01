@@ -13,7 +13,8 @@ namespace GE.MiniGames.Dino
         public DinoArt Art => art;
         public override string GameId => "MiniGame04";
         public override int Progress => Mathf.FloorToInt(Model?.Distance ?? 0);
-        public override int Target => Mathf.CeilToInt(Model?.Rules.goalDistance ?? rules.goalDistance);
+        // HUD와 공통 결과 집계도 1.5배로 늘어난 실제 목표 거리를 사용합니다.
+        public override int Target => Mathf.CeilToInt(Model?.Rules.GoalDistance ?? rules.GoalDistance);
         public override string StartInstructions => "목표지점까지 도달하기\nSpace 점프  /  Tab 일시정지 · 재개\n낮은 새는 점프 / 높은 새는 뛰지 않고 통과";
 
         public void Configure(DinoRules settings, DinoArt appearance) { rules = settings; art = appearance; }

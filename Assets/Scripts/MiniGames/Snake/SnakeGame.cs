@@ -9,7 +9,8 @@ namespace GE.MiniGames.Snake
         [SerializeField, Range(4, 20)] private int boardWidth = 10;
         [SerializeField, Range(4, 20)] private int boardHeight = 10;
         [SerializeField, Min(0.05f)] private float moveInterval = 0.25f;
-        [SerializeField, Min(1)] private int targetApples = 5;
+        // 기존 씬에 저장된 5개 목표 대신 코드의 10개 목표를 사용해 씬 수정 없이 밸런스를 적용합니다.
+        private const int TargetApples = 10;
         [SerializeField, Min(1)] private int initialLength = 3;
         [Tooltip("-1: random each attempt; 0 or more: repeatable testing seed.")]
         [SerializeField] private int randomSeed = -1;
@@ -18,7 +19,7 @@ namespace GE.MiniGames.Snake
         public SnakeModel Model { get; private set; }
         public override string GameId => "MiniGame01";
         public override int Progress => Model?.ApplesEaten ?? 0;
-        public override int Target => Model?.TargetApples ?? targetApples;
+        public override int Target => Model?.TargetApples ?? TargetApples;
         public float MoveInterval => moveInterval;
         public override string StartInstructions => $"WASD  방향 전환\n사과 {Target}개를 먹으면 성공!\n벽과 자신의 몸을 피하세요.";
 
@@ -28,9 +29,8 @@ namespace GE.MiniGames.Snake
             boardWidth = Mathf.Clamp(boardWidth, 4, 20);
             boardHeight = Mathf.Clamp(boardHeight, 4, 20);
             initialLength = Mathf.Clamp(initialLength, 1, boardWidth - 1);
-            targetApples = Mathf.Clamp(targetApples, 1, boardWidth * boardHeight - initialLength);
             moveInterval = Mathf.Max(0.05f, moveInterval);
-            Model = new SnakeModel(boardWidth, boardHeight, targetApples, initialLength,
+            Model = new SnakeModel(boardWidth, boardHeight, TargetApples, initialLength,
                 randomSeed < 0 ? (int?)null : randomSeed);
             elapsed = 0f;
         }

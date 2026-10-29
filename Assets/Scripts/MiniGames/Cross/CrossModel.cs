@@ -20,24 +20,30 @@ namespace GE.MiniGames.Cross
     // 차량 생성·격자 이동·충돌만 담당합니다. 시간 공급, 정지, 결과 통지는 공통 컨트롤러의 책임입니다.
     public sealed class CrossModel
     {
-        public const int CellSize = 50, Columns = 10, Rows = 12, RoadRows = 10;
+        // 출발 행을 제외한 전진 25칸이 목표입니다. 5·15번째 안전지대와 마지막 도착 행도 진행에 포함합니다.
+        public const int CellSize = 50, Columns = 10, RoadRows = 25, Rows = RoadRows + 1;
         public const int Width = Columns * CellSize, Height = Rows * CellSize;
         public const float PlayerSize = 36, CarWidth = 75, CarHeight = 36;
         private readonly List<CrossCar> cars = new List<CrossCar>();
         public IReadOnlyList<CrossCar> Cars => cars;
         public int PlayerColumn { get; private set; } = Columns / 2;
         public int PlayerRow { get; private set; } = Rows - 1;
-        // 차선에 진입하는 것이 아니라 그 차선을 벗어나야 통과로 셉니다. 성공은 반드시 0행 도착입니다.
-        public int CrossedLanes => Math.Max(0, RoadRows - PlayerRow);
+        // 출발 위치부터 전진한 칸 수를 표시하며, 뒤로 이동하면 진행률도 되돌아갑니다. 25칸 전진하면 0행입니다.
+        public int CrossedLanes => Rows - 1 - PlayerRow;
         public float PlayerX => PlayerColumn * CellSize + (CellSize - PlayerSize) / 2;
         public float PlayerY => PlayerRow * CellSize + (CellSize - PlayerSize) / 2;
         public CrossStep Result { get; private set; }
 
+        // 출발점 기준 5·15칸과 양 끝 행은 차량 생성과 화면 표시가 공유하는 안전 구간입니다.
+        public static bool IsSafeRow(int row) => row == 0 || row == Rows - 1
+            || Rows - 1 - row == 5 || Rows - 1 - row == 15;
+
         public CrossModel(int? seed = null)
         {
             var random = seed.HasValue ? new Random(seed.Value) : new Random();
-            for (int row = 1; row <= RoadRows; row++)
+            for (int row = 1; row < Rows - 1; row++)
             {
+                if (IsSafeRow(row)) continue;
                 int direction = random.NextDouble() > .5 ? 1 : -1;
                 // HTML의 (1.2~3.2)*0.8 px/16.66ms를 Unity의 초 단위 속도로 변환합니다.
                 float speed = (float)((random.NextDouble() * 2 + 1.2) * .8 / .01666);
