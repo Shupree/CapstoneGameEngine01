@@ -12,7 +12,7 @@ public sealed class MainGameEventDirector : MonoBehaviour
     {
         [SerializeField, InspectorName("이벤트")] private MainGameEventBase eventBehaviour;
         [SerializeField, Min(0), InspectorName("가중치")]
-        [Tooltip("0이면 선택하지 않습니다. 예: 문 방문 75, 발소리 25를 입력하면 각각 75%, 25%입니다.")]
+        [Tooltip("0이면 선택하지 않습니다. 예: 문 방문 65, 창문 등장 10, 발소리 25이면 각각 65%, 10%, 25%입니다.")]
         private int weight = 1;
 
         public MainGameEventBase Event => eventBehaviour;
@@ -67,7 +67,7 @@ public sealed class MainGameEventDirector : MonoBehaviour
         if (state == DirectorState.Stopped) return;
         if (state == DirectorState.Running)
         {
-            // 완료는 엄마 퇴장과 문 닫힘까지 포함합니다. 그 프레임부터 새 대기 시간을 셉니다.
+            // 완료는 각 이벤트의 엄마 퇴장과 문·창문 닫힘까지 포함합니다. 그 프레임부터 새 대기 시간을 셉니다.
             if (activeEvent == null || !activeEvent.IsRunning)
             {
                 activeEvent = null;

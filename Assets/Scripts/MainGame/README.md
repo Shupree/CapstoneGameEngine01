@@ -7,9 +7,12 @@
 - `MainGameEventDirector`: 최초 진입 및 이벤트 완료 뒤 30~120초를 무작위로 기다린다. Inspector의 `이벤트별 선택 가중치` 목록에서 실행 가능한 항목 하나를 가중치에 따라 선택하며 중복 실행하지 않는다.
 - `MainGameEventBase`: `CanRun`, `TryBegin()`, `IsRunning`, `IsDetectionActive`, `Cancel()`의 공통 계약이다. 개별 연출은 `ExecuteEvent()`, 취소 정리는 `OnCancelled()`에서 구현한다.
 - `MotherDoorVisitEvent`: 발걸음 재생, 문과 엄마의 방문 순서, 발각 구간을 관리한다.
+- `MotherWindowPeekEvent`: 노크 두 번, 무음 창문 개폐, 수평으로 들이미는 상체·얼굴과 발각 구간을 관리한다.
 - `MotherFootstepsOnlyEvent`: 같은 발걸음을 끝까지 재생 → 1초 대기 → 같은 발걸음을 다시 끝까지 재생한다. 엄마와 문을 제어하지 않고 발각 판정은 항상 꺼져 있다.
 - `MotherActorController`: 모델의 이동·회전과 Animator의 `Speed`를 제어한다. 이동 중 기존 Run을 0.45배로 재생하고 관찰 중 Idle은 1배로 복원한다. Root Motion은 사용하지 않는다.
 - `DoorController`: 기존 문 회전 API를 재사용한다.
+- `WindowController`: 창짝의 위치와 열림 정도를 관리한다. 개폐 시간은 이벤트의 Inspector 설정에서 전달한다.
+- `MotherAppearance` / `MotherAppearanceProfile`: 모든 엄마의 공통 어두운 외형을 관리한다. 원본 머티리얼의 색·텍스처·알파는 보존하고 인스턴스의 색과 광택을 조절한다.
 - `MiniGameManager`: Shift 숨김 상태를 제공하고 게임오버·전체 재시작을 담당한다. `GameOverTriggered`와 `GameFinished`를 받으면 Director가 진행 중 이벤트와 다음 타이머를 취소한다.
 - `MainGameDeveloperTools`: Editor와 Development Build의 개발자 도구 표시·버튼 상태만 관리한다. 버튼의 실제 동작은 Director와 MiniGameManager의 공통 API에 위임한다.
 - `MainGameCameraLookController`: MainGame 카메라의 시선만 제어한다. 매니저가 제공하는 숨김 상태에서 좌우 키를 받고, 마지막 각도와 양쪽 끝의 시선 제한을 유지한다.
@@ -38,19 +41,51 @@ MainGame의 `MainGameEvents`를 선택하고 `MainGameEventDirector → 이벤�
 
 | 이벤트 | 가중치 | 현재 선택 확률 |
 | --- | ---: | ---: |
-| MotherDoorVisit | 75 | 75% |
+| MotherDoorVisit | 65 | 65% |
+| MotherWindowPeek | 10 | 10% |
 | MotherFootstepsOnly | 25 | 25% |
 
-- 가중치 합이 100이 아니어도 비율로 계산한다. 예를 들어 3과 1도 75%와 25%다. 변경은 다음 추첨부터 적용한다.
+- 가중치 합이 100이 아니어도 비율로 계산한다. 예를 들어 13:2:5도 65%:10%:25%다. 변경은 다음 추첨부터 적용한다.
 - 가중치 0, 비활성, 필수 참조가 없는 이벤트는 선택에서 제외한다. 확률은 남은 유효 항목의 합을 기준으로 계산한다.
 - 기존 단순 `Events` 목록을 가진 씬은 참조를 기본 가중치 1로 한 번만 이전한다. 이미 설정된 새 목록의 가중치는 보존한다.
-- 자동 이벤트와 개발자 도구의 `다음 이벤트 즉시 실행`은 같은 확률 설정을 사용한다. 한 번 추첨할 때마다 독립적으로 선택하므로 짧은 실행 횟수에서 비율이 반드시 75:25로 맞지는 않는다.
+- 자동 이벤트와 개발자 도구의 `다음 이벤트 즉시 실행`은 같은 확률 설정을 사용한다. 한 번 추첨할 때마다 독립적으로 선택하므로 짧은 실행 횟수에서 비율이 반드시 65:10:25로 맞지는 않는다.
 
 `MainGameEvents/MotherFootstepsOnly`에는 문 방문과 같은 `Step_Walk` 클립과 AudioSource 설정을 연결했다. 접근과 돌아가는 소리를 각각 원본 속도로 한 번 재생하며, 사이에 `Turnaround Delay` 1초를 기다린다. 실제 재생 종료를 기준으로 순서를 진행한다. 돌아가는 소리까지 끝난 뒤에야 다음 이벤트 대기를 예약한다.
 
 돌아가는 소리는 Unity의 `AudioSource.volume`과 `Retreat Volume Curve`로 점차 작아진다. 커브의 X는 재생 진행률(0~1), Y는 원래 음량에 곱하는 배율이다. 기본값은 1→0이며 Inspector에서 감쇠 모양을 조절할 수 있다. 오디오 DSP 시계를 사용하고 클립 속도와 재생 길이는 유지한다. 접근 소리는 원래 크기로 재생하고, 정상 종료·취소 뒤에는 Inspector에서 설정한 음량을 복원한다.
 
 이 이벤트는 게임기가 보이더라도 발각을 발생시키지 않는다. 엄마 모델과 Door_7의 활성 상태·위치·회전은 변경하지 않는다. 개발자 도구로 취소하거나 전체 게임이 종료되면 대기와 소리를 함께 정리한다.
+
+## 창문 등장 순서와 조절 항목
+
+대상은 침대 옆 `Map/wallWindowSlide`이며 책상 쪽 `wallWindowSlide (1)`은 제어하지 않는다. 아래 창짝 `windowBottom`을 위로 밀어 연다.
+
+```text
+Knock_Window 재생 종료
+→ After First Knock Delay (기본 1초)
+→ Knock_Window 재생 종료
+→ After Second Knock Delay (기본 1초)
+→ 효과음 없이 창문 열기 (기본 0.8초)
+→ 완전히 열린 뒤 엄마 등장, 방 안으로 상체를 수평으로 들이미는 자세로 이동
+→ Watch Seconds (기본 1초)
+→ 창밖 자세로 물러나 숨김
+→ 효과음 없이 창문 닫기 (기본 0.8초)
+→ 완전히 닫힌 뒤 이벤트 완료, 다음 이벤트 대기
+```
+
+`MainGameEvents/MotherWindowPeek`의 `MotherWindowPeekEvent`에서 두 노크 뒤 대기 시간과 `Watch Seconds`를 각각 조절한다. `Window Open Seconds`와 `Window Close Seconds`는 소리와 독립된 개폐 시간이며 각각 기본 0.8초다. `Peek Transition Seconds`는 들이밀기·물러나기의 보간 시간이며 기본 0.35초다.
+
+`WindowPeekWaypoints`의 `OutsideWindow`와 `PeekInside`가 위치·기울기를 결정한다. 상체 축을 수평으로 눕혀 얼굴이 화면에서 상체 왼쪽의 방 안 공간으로 나오게 배치했다. 현재 PeekInside 위치는 `(-0.65, 1.52, -3.2)`, 회전은 `(18, -57, -90)`도이며 시선은 침대의 플레이어 쪽이다. 하체는 창밖에 두고 기존 카메라 위치·시야각을 사용한다. 문 방문과 같은 `MotherActorController`를 사용하고 `BlendPose()`로 Idle 자세를 보간한다. 다음 문 방문의 ShowAt은 문 밖 지점의 정상 서 있는 자세로 복원한다.
+
+발각은 **엄마가 표시되기 시작하는 Entering부터 창문이 완전히 닫힐 때까지**다. 경고·노크·여는 동안은 안전하고, 엄마가 사라진 뒤 닫히는 동안은 위험하다. 카메라 방향과 관계없이 기존 Shift 숨김으로 판정하며 공통 `CaughtByMother` 및 `Retry?`를 사용한다.
+
+이 이벤트는 0.864초의 `Knock_Window`만 두 번 재생한다. `Open_Window`는 열기·닫기 어느 구간에서도 재생하거나 길이를 참조하지 않는다. 원본 오디오 파일은 프로젝트에 보존했다. 모든 시간은 MainGame 시간에 따르며 Tab 정지는 영향을 주지 않는다. 취소·게임오버·목표 달성 시 소리와 엄마를 숨기고 창문을 즉시 닫는다.
+
+## 엄마의 공통 어두운 외형
+
+`Assets/_Art/Settings/MotherDarkAppearance.asset`의 `Tint`(기본 RGB 0.10)와 `Maximum Smoothness`(기본 0.08)를 조절한다. `MotherRealistic`과 `Mother` 프리팹의 `MotherAppearance`가 같은 프로필을 참조하므로 문·창문 등 모든 등장에 적용된다. MainGame의 공유 배우 인스턴스도 이 설정을 따른다.
+
+색은 원래 피부·옷·머리 색에 곱하고, 눈·피부 등의 광택을 제한하며 발광 색을 검정으로 만든다. `MaterialPropertyBlock`을 사용하므로 원본 공유 머티리얼이나 텍스처를 변형하지 않는다. 알파 값과 눈썹·속눈썹의 클리핑은 유지한다. 편집 화면에서도 적용되며 비활성화·컴포넌트 제거 시 기존 PropertyBlock을 복원한다.
 
 ## 씬에서 조절할 항목
 
@@ -59,13 +94,15 @@ MainGame의 `MainGameEvents`를 선택하고 `MainGameEventDirector → 이벤�
 - `MotherActor`: 모델/Animator 참조, 이동 속도, 회전 속도, Run 재생 속도.
 - `DoorVisitWaypoints`: 문 밖, 문턱, 문 안, 방 통로, 침대 옆, 플레이어 시선 목표. 방 배치를 바꾸면 경로가 가구와 겹치지 않도록 함께 조정한다. 지점의 높이는 발이 닿을 바닥 높이로 맞춘다.
 
-엄마 프리팹 인스턴스는 편집 시 비활성으로 저장하고 이벤트가 시작할 때 표시한다. 원본 프리팹과 Animator Controller를 수정하지 않고 씬 인스턴스로 구성한다.
+엄마 프리팹 인스턴스는 편집 시 비활성으로 저장하고 이벤트가 시작할 때 표시한다. 두 엄마 프리팹에는 공통 외형 컴포넌트를 연결했으며 이동·방문 자세는 씬의 지점으로 구성한다. 기존 Animator Controller는 유지한다.
 
-Inspector의 `Interval Seconds`와 `Watch Seconds`는 **X=최소, Y=최대(초)**다. 두 값을 같게 설정하면 고정 시간이다. 이벤트 간격 변경은 다음 대기 예약부터, 관찰 시간 변경은 다음 관찰 구간부터 반영된다. 음수와 역전된 범위는 Inspector에서 보정한다.
+Inspector의 `Interval Seconds`와 **문 방문 이벤트의** `Watch Seconds`는 **X=최소, Y=최대(초)**다. 두 값을 같게 설정하면 고정 시간이다. 창문 이벤트의 `Watch Seconds`는 단일 시간이다. 이벤트 간격 변경은 다음 대기 예약부터, 관찰 시간 변경은 다음 관찰 구간부터 반영된다. 음수와 역전된 범위는 Inspector에서 보정한다.
 
 ## 개발자 도구
 
 MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. 사용자가 추가한 배경 스타일을 유지하며, `[개발자 도구]`를 누르면 다섯 버튼을 펼치거나 접는다. UI를 열어도 게임은 계속 진행된다.
+
+MainGame의 기존 `EventSystem`은 **씬 최상위**에 둔다. 숨길 수 있는 테스트 Canvas `UIsRoot` 아래에 두면 Canvas 비활성화와 함께 입력 모듈도 꺼져, 다른 Canvas의 개발자 도구·Retry 버튼까지 클릭되지 않는다. Canvas의 표시 상태와 입력 시스템 수명을 분리하고, Additive 미니게임의 EventSystem은 기존 매니저 정책대로 비활성화해 활성 시스템을 하나로 유지한다.
 
 | 버튼 | 동작 |
 | --- | --- |
@@ -80,6 +117,7 @@ MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. �
 - 전환 중 중복 미니게임 요청을 받지 않는다. 게임오버·목표 달성 후에는 도구를 사용할 수 없다.
 - `UNITY_EDITOR || DEVELOPMENT_BUILD` 조건에서만 표시·실행한다. 일반 빌드에서는 UI 루트를 숨기고 개발용 미니게임 전환 API도 요청을 거부한다.
 - 이벤트 즉시 실행 API는 `MainGameEventDirector.TryRunNextEventImmediately()`, 개발용 지정 미니게임 전환 API는 `MiniGameManager.TryLoadMiniGameForDevelopment(string)`이다. UI에서 직접 씬을 로드하거나 목숨을 초기화하지 않는다.
+- 클릭 검증은 Button.onClick이나 ExecuteEvents 직접 호출만으로 끝내지 않는다. `MainGameDeveloperToolsTests`의 Mouse 테스트는 실제 입력 액션·InputSystemUIInputModule·EventSystem을 거쳐 메뉴, 기존 테스트 UI, Retry와 재시작 후 클릭까지 확인한다.
 
 ## 이벤트 추가
 
@@ -89,7 +127,7 @@ MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. �
 4. `OnCancelled`에서 소리·이동·문 등 해당 이벤트가 사용한 자원을 정리한다. 취소 시 성공·실패 결과를 새로 보내지 않는다.
 5. 씬에 배치하고 Director의 `이벤트별 선택 가중치` 목록에 연결하고 비중을 설정한다. Director에 이벤트 타입별 분기문을 추가하지 않는다.
 
-창문 방문은 별도 이벤트에서 다른 이동 경로와 발각 구간을 정하고 `MotherActorController`를 재사용하면 된다. 같은 배우를 쓰는 이벤트도 Director가 하나씩 실행하므로 겹치지 않는다.
+현재 문·창문 이벤트가 `MotherActorController`를 공유한다. 앞으로 다른 등장 방법도 개별 이동 지점과 발각 구간을 가진 이벤트로 추가하면 된다. 같은 배우를 쓰는 이벤트도 Director가 하나씩 실행하므로 겹치지 않는다.
 
 ## 입력
 
@@ -116,4 +154,4 @@ Inspector에서 다음 항목을 조절한다.
 
 PlayMode `MainGameCameraLookTests`는 실제 키의 좌우 방향·양끝 제한·각도 유지·수평 회전과 FOV 고정·좌우 및 정면 통과 시 각속도 일치·Tab 정지와 메인 시간·미니게임 교체·전체 재시작을 검증한다.
 
-PlayMode의 `MainGameMotherEventIntegrationTests`, `MainGameFootstepsEventTests`, `MainGameDeveloperToolsTests`, `MiniGamePauseIntegrationTests`가 시간·발각·재시작·숨김·개발자 버튼 조합을 검증한다. 앞의 세 테스트 묶음은 `MainGameEventIntegration` 카테고리로 함께 실행할 수 있다. 문 방문 전용 테스트에서는 실행 인스턴스의 가중치만 고정하고, 발소리 전용 테스트에서는 저장된 75:25 설정·가중치 경계·두 번 재생·1초 대기·안전성·취소를 검증한다. 목표 18회 달성 시 이벤트는 중단되지만 엔딩 화면은 별도 구현 영역이다.
+PlayMode의 `MainGameMotherEventIntegrationTests`, `MainGameFootstepsEventTests`, `MainGameWindowEventTests`, `MainGameDeveloperToolsTests`는 `MainGameEventIntegration` 카테고리로 실행한다. 저장된 65:10:25 설정·가중치 경계, 노크와 대기 순서·무음 개폐, 수평 상체의 방 안 진입, 문·창문 발각 구간과 Retry, 단계별 취소, 공통 외형, 개발자 버튼을 검증한다. `MiniGamePauseIntegrationTests`는 입력·숨김 조합을 검증한다. 목표 18회 달성 시 이벤트는 중단되지만 엔딩 화면은 별도 구현 영역이다.

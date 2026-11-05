@@ -62,6 +62,9 @@ Lobby
 | `Assets/Scripts/MainGame/MainGameEventDirector.cs` | 이벤트 완료 뒤 30~120초 대기, Inspector의 이벤트·가중치 목록으로 선택, 동시 실행 방지, 숨김 상태 기반 공통 발각 판정. 씬 수명에 종속된다. |
 | `Assets/Scripts/MainGame/MainGameEventBase.cs` | 개별 이벤트의 실행·완료·취소·발각 구간 계약. 새로운 이벤트는 이 타입을 상속해 Director 목록에 등록한다. |
 | `Assets/Scripts/MainGame/MotherDoorVisitEvent.cs` | 발걸음 → 문 열기 → 침대 관찰 → 퇴장 → 문 닫기의 순서와 발각 시간. |
+| `Assets/Scripts/MainGame/MotherWindowPeekEvent.cs` | 노크 두 번 → 무음 개방 → 수평 상체·얼굴을 방 안으로 들이밀기 → 퇴장 → 무음 닫힘. 표시 시작부터 완전 닫힘까지 발각 구간이다. |
+| `Assets/Scripts/MainGame/WindowController.cs` | 기존 아래 창짝의 수직 슬라이드와 열림 상태. 소리와 독립된 Inspector 개폐 시간을 이벤트에서 전달한다. |
+| `Assets/Scripts/MainGame/MotherAppearance.cs`, `MotherAppearanceProfile.cs` | 모든 엄마 프리팹의 공통 어두운 외형. 공유 프로필과 PropertyBlock을 사용해 원본 머티리얼·텍스처·알파를 보존한다. |
 | `Assets/Scripts/MainGame/MotherFootstepsOnlyEvent.cs` | 접근 발소리 → 1초 대기 → 돌아가는 발소리. 문·엄마를 제어하지 않고 발각 판정은 항상 false다. |
 | `Assets/Scripts/MainGame/MotherActorController.cs` | Inspector 이동 지점을 따라 이동·회전하고 기존 Run을 감속한다. 이벤트 주기나 게임오버를 관리하지 않는다. |
 | `Assets/Scripts/MainGame/DoorController.cs` | 기존 경첩 회전과 Open/Close/IsOpen/IsClosed API. 입력과 발각 판정은 외부 책임이다. |
@@ -177,6 +180,7 @@ MainGame
 - 정지 Image는 미니게임 viewport만, 게임오버 Image는 MainGame 전체를 덮어야 한다. 해상도가 바뀌어도 텍스트가 중앙에 있어야 한다.
 - 정지 Image·Text는 불필요한 클릭을 가로채지 않아야 한다. 게임오버 배경은 아래 화면 클릭을 막고 `Retry?` Text는 클릭을 받아야 한다.
 - MainGame과 Additive 미니게임을 합쳐 **활성 EventSystem은 하나**로 유지한다. 매니저가 미니게임 씬의 EventSystem과 입력 모듈을 런타임에 비활성화하는 처리를 보존한다.
+- MainGame의 기존 EventSystem은 씬 최상위에 둔다. 비활성화할 수 있는 `UIsRoot`·개발자 패널·정지/게임오버 오버레이 아래로 다시 넣지 않는다. Canvas를 숨기면 다른 Canvas의 버튼까지 입력을 잃는 문제가 재발한다.
 - 미니게임 카메라는 매니저가 지정하는 viewport를 따른다. 현재 기본값은 `(0.15, 0.15, 0.7, 0.7)`, depth는 `1`이다. 전체 화면으로 덮어쓰지 않는다.
 - 새 미니게임 카메라가 `Camera.main` 선택을 방해하지 않도록 태그를 확인한다. 카메라·Canvas·조명·오디오 등 Additive 씬 간 간섭을 함께 확인한다.
 - `Base/Main Camera`의 시선은 `MainGameCameraLookController`가 담당한다. 위치·상하 각도·기울기·FOV·미니게임 카메라는 유지하며 Y축만 회전한다. Inspector의 `Left Yaw Offset`(음수, 책상)과 `Right Yaw Offset`(양수, 창문)으로 한계를 조절한다. `Rotation Speed Degrees Per Second`는 좌우 공통 각속도이며 기존 책상 속도인 약 66.89도/초를 기준으로 한다. 양끝까지 같은 시간을 쓰는 정규화 이동으로 되돌리면 좌우 속도가 달라지므로 실제 각도를 초당 일정하게 이동한다. 자동 상향 회전·FOV 보정을 다시 추가하지 않는다. 화면 재표시·미니게임 교체는 마지막 시선을 유지하고 전체 Retry에서만 최초 구도로 돌아온다.
@@ -186,7 +190,9 @@ MainGame
 
 - 개발자 도구는 MainGame의 `DeveloperToolsCanvas`에 미리 배치한다. 일반 빌드에서는 숨긴다. 강제 미니게임 교체는 목숨·클리어 수·엄마 이벤트를 보존하고 Space 시작 대기로 연다. 이벤트 즉시 실행은 기존 이벤트를 취소한 뒤 무작위 실행한다.
 - 이벤트 간격과 침대 관찰 시간의 Inspector 설정 위치·개발자 도구 동작은 [MainGame 가이드](Assets/Scripts/MainGame/README.md)를 따른다.
-- 현재 이벤트 가중치는 문 방문 75, 발소리만 25다. Director의 `eventEntries` 목록에서 함께 관리한다. 0/비활성/실행 불가능 항목을 제외한 비율로 선택하며, 기존 `events` 참조 목록은 자동 이전용 숨김 필드로 보존한다. 새 이벤트를 하드코딩 분기로 선택하지 않는다.
+- 현재 이벤트 가중치는 문 방문 65, 창문 등장 10, 발소리만 25다. Director의 `eventEntries` 목록에서 함께 관리한다. 0/비활성/실행 불가능 항목을 제외한 비율로 선택하며, 기존 `events` 참조 목록은 자동 이전용 숨김 필드로 보존한다. 새 이벤트를 하드코딩 분기로 선택하지 않는다.
+- 창문 이벤트는 침대 옆 `Map/wallWindowSlide/windowBottom`만 움직인다. `MotherWindowPeek`의 두 노크 뒤 대기·관찰·무음 개폐 시간은 각각 Inspector에서 조절한다. `Open_Window`는 어떤 단계에서도 재생하지 않는다. 기존 배우를 `BlendPose`로 수평 자세에 놓아 얼굴과 상체가 방 안으로 나오게 하며, 위치·회전은 `WindowPeekWaypoints`에서 조절한다. 다음 문 이벤트는 자신의 ShowAt 지점으로 서 있는 자세를 복원한다. 엄마가 사라진 후에도 창문이 완전히 닫힐 때까지 발각 구간을 유지하고, 종료·취소 시 소리·배우·창문을 함께 복원한다.
+- 모든 엄마 외형은 `Assets/_Art/Settings/MotherDarkAppearance.asset`을 공유한다. 두 엄마 프리팹의 `MotherAppearance`를 유지하고 피부·머리·옷의 원본 공유 머티리얼을 직접 어둡게 덮어쓰지 않는다. 이 설정은 문 방문과 창문 등장에 함께 적용한다.
 
 - Editor 버전은 `ProjectSettings/ProjectVersion.txt`를 따른다. 현재 `6000.3.23f1`이다.
 - URP, New Input System, uGUI/TMP를 유지한다. 버전과 의존성은 `Packages/manifest.json` 및 `packages-lock.json`을 확인한다.
@@ -212,8 +218,9 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 | PlayMode `MiniGamePauseIntegrationTests` | Tab 정지·재개, Shift 숨김과의 조합, 정지 UI 수명 |
 | PlayMode `MiniGameLivesIntegrationTests` | 목숨 차감·로컬 재시도·게임오버·전체 재시작·다른 패배 원인 |
 | PlayMode `MainGameMotherEventIntegrationTests` | 실제 소리 종료·문 시작 기준 시간, 침대 관찰·퇴장, 닫힘 중 발각, Tab 상태의 발각, 재시작·목표 달성 시 이벤트 수명 |
-| PlayMode `MainGameFootstepsEventTests` | 75:25 가중치 경계·0/비활성 제외·기존 참조 이전, 원본 소리 두 번 재생·1초 대기·무발각·문/엄마 정지·취소 |
-| PlayMode `MainGameDeveloperToolsTests` | 저장된 버튼 클릭·Raycaster, 이벤트 취소·재실행, 지정 미니게임 Ready 전환·진행도 보존, 종료 시 차단, Inspector 시간 적용 |
+| PlayMode `MainGameFootstepsEventTests` | 65:10:25 가중치 경계·0/비활성 제외·기존 참조 이전, 원본 소리 두 번 재생·1초 대기·무발각·문/엄마 정지·취소 |
+| PlayMode `MainGameWindowEventTests` | 원본 노크·무음 개폐·Inspector 시간, 수평 상체의 방 안 진입, 등장부터 닫힘까지 발각·Retry, 경고/닫힘 후 안전, 전 단계 취소·배우 공유·어두운 외형 |
+| PlayMode `MainGameDeveloperToolsTests` | 버튼 연결·Raycaster, 실제 마우스로 메뉴·기존 테스트 UI·Retry·재시작 후 클릭, Canvas 숨김과 입력 수명 분리, 이벤트 취소·재실행, 미니게임 Ready 전환·진행도 보존, 종료 시 차단, Inspector 시간 적용 |
 | PlayMode `MainGameCameraLookTests` | 실제 숨김·화살표 방향, 부드러운 수평 회전과 제한, 좌우·정면 통과 각속도 일치, 각도 보존·FOV 고정, Tab 정지·메인 시간·미니게임 교체·전체 재시작 |
 
 관련 기능을 수정한 경우 다음을 확인한다.

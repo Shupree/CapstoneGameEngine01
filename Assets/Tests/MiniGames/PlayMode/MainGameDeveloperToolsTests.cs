@@ -16,38 +16,58 @@ namespace GE.MiniGames.PlayModeTests
 {
     // 저장된 버튼의 클릭 연결과 실제 Additive 전환을 검증합니다. 메인 타입은 기존 어셈블리에 유지합니다.
     [Category("MainGameEventIntegration")]
-    public sealed class MainGameDeveloperToolsTests : InputTestFixture
+    public sealed class MainGameDeveloperToolsTests
     {
         private MonoBehaviour manager, director, visit, tools;
         private Keyboard keyboard;
+        private Mouse mouse;
         private float originalTimeScale;
-        private readonly Dictionary<InputActionAsset, InputDevice[]> actionDevices = new Dictionary<InputActionAsset, InputDevice[]>();
+        private bool originalRunInBackground;
+        private InputSettings.BackgroundBehavior originalBackgroundBehavior;
+#if UNITY_EDITOR
+        private InputSettings.EditorInputBehaviorInPlayMode originalEditorInputBehavior;
+#endif
+        private readonly List<InputDevice> disabledDevices = new List<InputDevice>();
 
-        public override void Setup()
+        [SetUp]
+        public void Setup()
         {
-            base.Setup();
-            keyboard = InputSystem.AddDevice<Keyboard>();
-            foreach (var asset in Resources.FindObjectsOfTypeAll<InputActionAsset>())
+            // 씬 통합 테스트는 실행 중인 입력 시스템을 유지합니다. 전역 Reset/Disable은 이미 켜진 UI 모듈의 액션을 끄므로 사용하지 않습니다.
+            foreach (var device in InputSystem.devices.ToArray())
             {
-                actionDevices[asset] = asset.devices.HasValue ? asset.devices.Value.ToArray() : null;
-                asset.Disable();
-                asset.devices = new InputDevice[] { keyboard };
+                if (!device.enabled || !(device is UnityEngine.InputSystem.Pointer || device is Keyboard)) continue;
+                disabledDevices.Add(device);
+                InputSystem.DisableDevice(device);
             }
+            keyboard = InputSystem.AddDevice<Keyboard>();
+            mouse = InputSystem.AddDevice<Mouse>();
             originalTimeScale = Time.timeScale;
+            originalRunInBackground = Application.runInBackground;
+            originalBackgroundBehavior = InputSystem.settings.backgroundBehavior;
+            Application.runInBackground = true;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+#if UNITY_EDITOR
+            originalEditorInputBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+#endif
             Time.timeScale = 1f;
         }
 
-        public override void TearDown()
+        [TearDown]
+        public void TearDown()
         {
             Time.timeScale = originalTimeScale;
-            base.TearDown();
-            foreach (var item in actionDevices)
-            {
-                if (item.Key == null) continue;
-                item.Key.Disable();
-                item.Key.devices = item.Value;
-            }
-            actionDevices.Clear();
+            // 공유 액션의 바인딩/활성 상태를 수정하지 않고 장치만 교체·복원하여 UI 입력 수명까지 그대로 검증합니다.
+            if (mouse != null && mouse.added) InputSystem.RemoveDevice(mouse);
+            if (keyboard != null && keyboard.added) InputSystem.RemoveDevice(keyboard);
+            foreach (var device in disabledDevices)
+                if (device.added) InputSystem.EnableDevice(device);
+            disabledDevices.Clear();
+            InputSystem.settings.backgroundBehavior = originalBackgroundBehavior;
+#if UNITY_EDITOR
+            InputSystem.settings.editorInputBehaviorInPlayMode = originalEditorInputBehavior;
+#endif
+            Application.runInBackground = originalRunInBackground;
         }
 
         [UnitySetUp]
@@ -86,6 +106,65 @@ namespace GE.MiniGames.PlayModeTests
             }
             Time.timeScale = originalTimeScale;
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator MouseClicks_WorkWithLegacyCanvasHidden_AndAfterMiniGameSwitch()
+        {
+            var legacy = Resources.FindObjectsOfTypeAll<GameObject>().First(go => go.scene.name == "MainGame" && go.name == "UIsRoot");
+            legacy.SetActive(false);
+            // EventSystem이 숨길 수 있는 Canvas의 자식이면 이 시점부터 실제 마우스 클릭이 모두 사라집니다.
+            Assert.That(EventSystem.current, Is.Not.Null);
+            Assert.That(EventSystem.current.isActiveAndEnabled, Is.True);
+            Assert.That(EventSystem.current.transform.IsChildOf(legacy.transform), Is.False);
+            Assert.That(Object.FindObjectsByType<EventSystem>(FindObjectsSortMode.None).Count(system => system.isActiveAndEnabled), Is.EqualTo(1));
+
+            var panel = Field<GameObject>(tools, "toolsPanel");
+            yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "menuButton"));
+            Assert.That(panel.activeSelf, Is.True, "마우스 클릭으로 개발자 메뉴가 열려야 합니다.");
+            yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "snakeButton"));
+            yield return WaitFor(() => !Property<bool>(manager, "IsTransitioning"));
+            Assert.That(Field<MiniGameController>(manager, "currentMiniGameController").GameId, Is.EqualTo("MiniGame01"));
+            Assert.That(Field<MiniGameController>(manager, "currentMiniGameController").State, Is.EqualTo(MiniGameState.Ready));
+            yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "menuButton"));
+            Assert.That(panel.activeSelf, Is.False);
+
+            // 기존 테스트 Canvas를 잠깐 켜도 같은 EventSystem으로 그 안의 버튼을 처리해야 합니다.
+            var page = legacy.GetComponentInChildren(Type.GetType("PageBase, Assembly-CSharp", true), true) as MonoBehaviour;
+            page.GetType().GetField("_fakeLoadDuration", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(page, 0f);
+            legacy.SetActive(true);
+            yield return null;
+            yield return null;
+            var legacyButton = legacy.GetComponentsInChildren<UnityEngine.UI.Button>().First();
+            int legacyClicks = 0;
+            legacyButton.onClick.AddListener(() => legacyClicks++);
+            yield return PointerClick(legacyButton);
+            Assert.That(legacyClicks, Is.EqualTo(1), "기존 테스트 UI도 실제 마우스 입력을 받아야 합니다.");
+            legacy.SetActive(false);
+            yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "menuButton"));
+            Assert.That(panel.activeSelf, Is.True, "Canvas를 다시 숨겨도 개발자 도구 입력은 유지되어야 합니다.");
+        }
+
+        [UnityTest]
+        public IEnumerator MouseRetry_RestartsMainGame_AndNewDeveloperMenuStillReceivesClicks()
+        {
+            var reason = Type.GetType("EGameOverReason, Assembly-CSharp", true);
+            Call(manager, "TriggerGameOver", Enum.Parse(reason, "CaughtByMother"));
+            Assert.That(Time.timeScale, Is.Zero);
+            var oldManager = manager;
+            yield return PointerClick(Field<UnityEngine.UI.Button>(manager, "gameOverRetryButton"));
+            yield return WaitFor(() => Find("MiniGameManager") != null && Find("MiniGameManager") != oldManager);
+            manager = Find("MiniGameManager");
+            director = Find("MainGameEventDirector");
+            visit = Find("MotherDoorVisitEvent");
+            tools = Find("MainGameDeveloperTools");
+            Call(director, "StopEvents");
+            yield return WaitFor(() => !Property<bool>(manager, "IsTransitioning"));
+            Assert.That(Property<int>(manager, "CurrentLives"), Is.EqualTo(3));
+            Assert.That(Time.timeScale, Is.EqualTo(1f));
+            Assert.That(Object.FindObjectsByType<EventSystem>(FindObjectsSortMode.None).Count(system => system.isActiveAndEnabled), Is.EqualTo(1));
+            yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "menuButton"));
+            Assert.That(Field<GameObject>(tools, "toolsPanel").activeSelf, Is.True);
         }
 
         [UnityTest]
@@ -234,7 +313,30 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(Time.time - started, Is.InRange(0.23f, 0.4f));
         }
 
-        // 실제 Raycaster에 걸리는 텍스트 버튼에 저장된 PointerClick 연결을 실행합니다. 추가 Image는 요구하지 않습니다.
+        // 실제 입력 액션 → InputSystemUIInputModule → EventSystem → Button 경로를 밟습니다. onClick/ExecuteEvents를 직접 호출하지 않습니다.
+        private IEnumerator PointerClick(UnityEngine.UI.Button button)
+        {
+            Assert.That(button.isActiveAndEnabled && button.interactable, Is.True);
+            Assert.That(EventSystem.current != null && EventSystem.current.isActiveAndEnabled, Is.True);
+            var module = EventSystem.current.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+            Assert.That(module.isActiveAndEnabled, Is.True);
+            Assert.That(module.leftClick.action.enabled, Is.True);
+            Assert.That(module.leftClick.action.controls.Any(control => control.device == mouse), Is.True);
+            Canvas.ForceUpdateCanvases();
+            var rect = (RectTransform)button.transform;
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = position });
+            yield return null;
+            yield return null;
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = position, buttons = 1 });
+            yield return null;
+            yield return null;
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = position });
+            yield return null;
+            yield return null;
+        }
+
+        // 버튼 연결과 기능 조합의 빠른 검증용 직접 호출입니다. 실제 포인터 경로의 회귀는 위 PointerClick 테스트들이 별도로 담당합니다.
         private void Click(string field)
         {
             var button = Field<UnityEngine.UI.Button>(tools, field);

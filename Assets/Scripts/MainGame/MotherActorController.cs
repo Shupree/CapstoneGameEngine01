@@ -27,6 +27,25 @@ public sealed class MotherActorController : MonoBehaviour
         SetMoving(false);
     }
 
+    // 창문 등장처럼 걷지 않는 연출용입니다. Inspector 자세의 상하 기울기까지 보간하고 Idle·Root Motion 해제 정책을 유지합니다.
+    public IEnumerator BlendPose(Transform point, float seconds)
+    {
+        SetMoving(false);
+        Vector3 startPosition = actorRoot.position;
+        Quaternion startRotation = actorRoot.rotation;
+        float elapsed = 0f;
+        float duration = Mathf.Max(0.01f, seconds);
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float blend = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(elapsed / duration));
+            actorRoot.SetPositionAndRotation(Vector3.Lerp(startPosition, point.position, blend),
+                Quaternion.Slerp(startRotation, point.rotation, blend));
+            yield return null;
+        }
+        actorRoot.SetPositionAndRotation(point.position, point.rotation);
+    }
+
     // MainGame 하이어라키의 경로를 따릅니다. 가구를 피해 배치한 중간 지점은 진입/퇴장 경로 양쪽에서 사용할 수 있습니다.
     public IEnumerator FollowPath(Transform[] points)
     {
