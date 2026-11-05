@@ -4243,6 +4243,14 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 1347178341273139869, guid: 0aa61300d5e2afc40a78c95820209945, type: 3}
+    - target: {fileID: 761511090505701407, guid: f425a902d71cd50488b50c47bb1846f1, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1347178341273139869, guid: 0aa61300d5e2afc40a78c95820209945, type: 3}
+    - target: {fileID: 761511090505701407, guid: f425a902d71cd50488b50c47bb1846f1, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: -3963241562183589234, guid: bb0fabe0352e6e248a1667df63e9e81a, type: 3}
     - target: {fileID: 919132149155446097, guid: f425a902d71cd50488b50c47bb1846f1, type: 3}
       propertyPath: m_Name
       value: Office Chair
