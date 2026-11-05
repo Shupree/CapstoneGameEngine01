@@ -70,6 +70,7 @@ Lobby
 | `Assets/Scripts/MainGame/MotherActorController.cs` | Inspector 이동 지점을 따라 이동·회전하고 기존 Run을 감속한다. 이벤트 주기나 게임오버를 관리하지 않는다. |
 | `Assets/Scripts/MainGame/DoorController.cs` | 기존 경첩 회전과 Open/Close/IsOpen/IsClosed API. 입력과 발각 판정은 외부 책임이다. |
 | `Assets/Scripts/MainGame/MainGameDeveloperTools.cs` | Editor·Development Build 전용 텍스트 버튼 UI. 이벤트 즉시 실행과 지정 미니게임 로드를 매니저 API에 위임한다. |
+| `Assets/Scripts/MainGame/MiniGameScreenGlow.cs` | `Base/MiniGameScreenLight`(Point Light)에 붙어 미니게임 viewport의 평균 색을 화면 복사·비동기 읽기로 샘플링해 조명 색·세기로 옮긴다. 매니저는 Inspector 참조로 조회만 하며(`IsMiniGameHidden`, `MiniGameViewportRect`), 숨김·게임오버·미니게임 없음이면 꺼진다. 방 주변광·달빛 값은 [셰이더 가이드 9장](Assets/Rendering/RetroScreen/SHADER_GUIDE.md)을 따른다. |
 | `Assets/Scripts/MainGame/MainGameCameraLookController.cs` | MainGame 카메라의 좌우 시선. Shift 숨김에서만 화살표 입력을 받고 마지막 각도를 유지한다. Inspector의 끝 각도와 좌우 공통 각속도를 사용한다. |
 | `Assets/Scripts/MiniGames/Common` | `IMiniGame`, `MiniGameController`, 결과·상태 계약, 단독 실행용 UI. 변경 시 모든 미니게임에 미칠 영향을 확인한다. |
 | `Assets/Scripts/MiniGames/Snake` | 스네이크 규칙·로컬 실행·화면 표시. 전체 목숨이나 다음 씬을 직접 관리하지 않는다. |

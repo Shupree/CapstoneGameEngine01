@@ -13,6 +13,7 @@ MainGame의 **방 화면**과 **게임기(미니게임) 화면**에 걸리는 �
 | 방 화면 효과 켜기/끄기·전체 강도 | `Base/Main Camera` | **Retro Screen Camera** (체크박스, `Intensity`) |
 | 게임기 화면(모든 미니게임)의 값·켜기/끄기·강도 | `Base/Global Volume` | **Retro Screen MiniGame Applier** |
 | 특정 미니게임 하나만 다르게 | 해당 미니게임 씬의 카메라 | **Retro Screen Camera**를 직접 추가 ([5장](#5-특정-미니게임만-다른-값-쓰기)) |
+| 방의 어둡기·그림자·달빛, 게임기 화면 빛 | `Lighting` 창, `Base/Directional Light`, `Base/MiniGameScreenLight` | [9장](#9-방-조명그림자와-게임기-화면-빛) (셰이더가 아닌 조명) |
 
 > 방 화면 값은 **프로필 에셋**(`Assets/Scenes/SampleMap/Global Volume Profile.asset`)에 저장된다.
 > 게임기 화면 값은 **MainGame 씬**에 저장된다. 둘 다 바꾼 뒤 저장(Ctrl+S)을 잊지 않는다.
@@ -157,6 +158,43 @@ public class ExampleScreenControl : MonoBehaviour
 4. Scene 뷰에는 기본적으로 효과가 보이지 않는다(피처의 `Show In Scene View`). Game 뷰에서 확인한다.
 5. Shift로 게임기를 숨기면 미니게임 카메라가 꺼지므로 게임기 효과도 같이 사라진다(정상).
 6. 정지·게임오버 UI(Screen Space - Overlay)에는 효과가 걸리지 않는다(정상).
+
+---
+
+## 9. 방 조명·그림자와 게임기 화면 빛
+
+셰이더(색감)와 별개로, 방의 밝기와 그림자는 **조명**이 정한다. 모두 MainGame 씬에 저장된다.
+
+| 바꾸고 싶은 것 | 위치 | 현재 값 |
+| --- | --- | --- |
+| 방 전체의 기본 밝기(그림자 진하기) | `Window › Rendering › Lighting` → Environment → **Environment Lighting** (Source = Gradient) | Sky (0.07, 0.085, 0.125), Equator (0.045, 0.05, 0.07), Ground (0.02, 0.02, 0.028) |
+| 반사 밝기 | 같은 창 → Environment Reflections → `Intensity Multiplier` | 0.3 |
+| 달빛(창문 그림자) | `Base/Directional Light` | 푸른빛 (0.55, 0.65, 1), Intensity 1.6, 회전 (14, 100, 0), Soft Shadows |
+| 게임기 화면 빛 | `Base/MiniGameScreenLight` (Point Light + **Mini Game Screen Glow**) | 아래 표 |
+
+- **그림자를 더 진하게** 하려면 Environment Lighting 세 색을 더 어둡게 한다. 그림자 속은 이 색으로만 밝혀진다.
+  너무 어두우면 숨은 상태(Shift)에서 문·엄마가 잘 안 보이므로 실제 화면에서 확인한다.
+- **달빛 위치**는 Directional Light의 회전으로 옮긴다. 지금은 침대 뒤쪽(서쪽) 창으로 들어와 옷장·책장에 창틀 모양 빛을 만든다.
+  X(첫 값)를 키우면 바닥 쪽으로, Y를 바꾸면 좌우로 움직인다.
+- 천장 조명(`Map/Light_Ceiling6`)은 Baked 모드인데 라이트맵이 없어서 화면에 영향이 없다(밤이라 꺼진 상태로 둠).
+
+### 게임기 화면 빛 (Mini Game Screen Glow)
+
+미니게임 화면의 평균 색을 0.1초마다 읽어 손 근처의 Point Light 색·밝기로 옮긴다. 화면이 빨가면 방도 붉게, 어두운 게임이면 빛도 약해진다.
+실제 화면을 복사해 읽으므로 그 영역에 그려진 정지 오버레이 같은 UI도 색에 섞일 수 있다.
+
+| 항목 | 효과 |
+| --- | --- |
+| `Max Intensity` | 화면이 가장 밝을 때 빛 세기(기본 2). 방이 너무 밝으면 줄인다 |
+| `Min Brightness` | 검은 배경 게임도 최소한 이 비율만큼 빛난다(기본 0.35) |
+| `Hidden Intensity Multiplier` | Shift로 숨겼을 때 남길 빛(기본 0 = 완전히 꺼짐). 0.1~0.2면 이불 속 화면이 새어 나오는 느낌 |
+| `Follow Screen Color` / `Color Saturation` | 화면 색 따라가기 켜기·끄기 / 0이면 흰빛, 1이면 화면 색 그대로 |
+| `Fallback Color` | 색을 따라가지 않을 때(또는 첫 샘플 전) 빛 색 |
+| `Sample Interval` / `Fade Speed` | 색을 읽는 간격 / 바뀌는 속도. Fade Speed가 크면 깜빡이듯 빠르게 바뀐다 |
+
+- Point Light 자체의 `Range`(기본 6)와 그림자 설정은 같은 오브젝트의 **Light** 컴포넌트에서 바꾼다. `Intensity`는 스크립트가 매 프레임 덮어쓰므로 Light에서 바꾸지 않는다.
+- 빛은 Play 모드에서만 켜진다(편집 화면에서는 세기 0). 미니게임이 없거나 게임오버면 꺼진다.
+- 빛 위치는 손 근처(카메라 앞 0.35m, 아래 0.15m)다. 좌우 시선 회전은 숨김 상태에서만 일어나고 그때는 빛이 꺼져 있으므로 카메라를 따라가지 않는다.
 
 ---
 

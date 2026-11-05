@@ -68,6 +68,8 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     public bool IsMiniGamePaused => isMiniGamePaused;
     // 개발자 UI는 전환 중 버튼을 잠그고 기존 비동기 씬 작업이 끝난 뒤 다시 요청합니다.
     public bool IsTransitioning => isLoading || isRestarting;
+    // 읽기 전용: 화면 빛 연출(MiniGameScreenGlow)이 미니게임 영역 색을 읽을 때 같은 viewport를 쓰기 위해 공개합니다.
+    public Rect MiniGameViewportRect => miniGameRect;
 
     [Header("MiniGame Camera Viewport Settings")]
     [Tooltip("미니게임 카메라의 위치 및 크기 (X, Y: 위치 / W, H: 크기 비율 0~1)")]
