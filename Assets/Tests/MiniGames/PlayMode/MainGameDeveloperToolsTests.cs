@@ -21,6 +21,7 @@ namespace GE.MiniGames.PlayModeTests
         private MonoBehaviour manager, director, visit, tools;
         private Keyboard keyboard;
         private Mouse mouse;
+        private AudioClip shortcutTestClip;
         private float originalTimeScale;
         private bool originalRunInBackground;
         private InputSettings.BackgroundBehavior originalBackgroundBehavior;
@@ -105,7 +106,111 @@ namespace GE.MiniGames.PlayModeTests
                 if (scene.IsValid() && scene.isLoaded) yield return SceneManager.UnloadSceneAsync(scene);
             }
             Time.timeScale = originalTimeScale;
+            if (shortcutTestClip != null) Object.Destroy(shortcutTestClip);
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator SpecificEventButtons_UseMouse_IgnoreWeights_AndPreserveMiniGameProgress()
+        {
+            yield return Keys(Key.LeftShift);
+            yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "menuButton"));
+            var shortcuts = Field<IEnumerable>(tools, "eventShortcuts").Cast<object>().ToArray();
+            Assert.That(shortcuts.Length, Is.EqualTo(4));
+            var entries = MainGameTestEvents.Entries(director);
+            // 가중치 0인 연출도 직접 재현하되 버튼이 제품 확률이나 현재 미니게임을 바꾸지 않아야 합니다.
+            foreach (var entry in entries) MainGameTestEvents.SetWeight(entry, 0);
+            Set(manager, "currentLives", 2);
+            Set(manager, "currentClearedCount", 5);
+            var game = Field<MiniGameController>(manager, "currentMiniGameController");
+            MonoBehaviour previous = null;
+            foreach (var shortcut in shortcuts)
+            {
+                var button = Field<UnityEngine.UI.Button>(shortcut, "button");
+                var selected = Field<MonoBehaviour>(shortcut, "eventBehaviour");
+                Assert.That(button.GetComponentInChildren<UnityEngine.UI.Image>(true), Is.Null);
+                Assert.That(button.onClick.GetPersistentEventCount(), Is.EqualTo(1));
+                Assert.That(button.onClick.GetPersistentMethodName(0), Is.EqualTo("RunEventImmediately"));
+                // 같은 버튼을 연속해서 눌러도 이전 실행을 취소한 뒤 처음부터 시작해야 합니다.
+                for (int repeat = 0; repeat < 2; repeat++)
+                {
+                    yield return PointerClick(button);
+                    Assert.That(Property<Object>(director, "ActiveEvent"), Is.SameAs(selected));
+                    Assert.That(Property<bool>(selected, "IsRunning"), Is.True);
+                    Assert.That(Property<object>(director, "State").ToString(), Is.EqualTo("Running"));
+                    Assert.That(Property<float>(director, "SecondsUntilNextEvent"), Is.Zero);
+                    Assert.That(entries.Cast<object>().Count(entry => Property<bool>(MainGameTestEvents.Event(entry), "IsRunning")), Is.EqualTo(1));
+                }
+                if (previous != null) Assert.That(Property<bool>(previous, "IsRunning"), Is.False);
+                previous = selected;
+                Assert.That(Field<MiniGameController>(manager, "currentMiniGameController"), Is.SameAs(game));
+                Assert.That(Property<int>(manager, "CurrentLives"), Is.EqualTo(2));
+                Assert.That(Property<int>(manager, "CurrentClearedCount"), Is.EqualTo(5));
+                Assert.That(Property<bool>(manager, "IsMiniGameHidden"), Is.True);
+                Assert.That(entries.Cast<object>().All(entry => Property<int>(entry, "Weight") == 0), Is.True);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator SpecificEventSwitches_RejectInvalidTargets_AndCleanUpMovingMotherAndOpenWindow()
+        {
+            yield return Keys(Key.LeftShift);
+            yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "menuButton"));
+            var shortcuts = Field<IEnumerable>(tools, "eventShortcuts").Cast<object>().ToArray();
+            var rushShortcut = shortcuts.First(item => Field<MonoBehaviour>(item, "eventBehaviour").GetType().Name == "MotherDoorRushEvent");
+            var windowShortcut = shortcuts.First(item => Field<MonoBehaviour>(item, "eventBehaviour").GetType().Name == "MotherWindowPeekEvent");
+            var footstepsShortcut = shortcuts.First(item => Field<MonoBehaviour>(item, "eventBehaviour").GetType().Name == "MotherFootstepsOnlyEvent");
+            var rush = Field<MonoBehaviour>(rushShortcut, "eventBehaviour");
+            var windowEvent = Field<MonoBehaviour>(windowShortcut, "eventBehaviour");
+            var actor = Find("MotherActorController");
+            var model = Field<Transform>(actor, "actorRoot");
+            shortcutTestClip = AudioClip.Create("Developer event switch test", 4410, 1, 44100, false);
+            Set(rush, "footstepsClip", shortcutTestClip);
+            Set(rush, "afterFootstepsDelay", 0f);
+            Set(rush, "beforeRushDelay", 0f);
+            Set(rush, "rushMoveSpeed", 0.1f);
+            Set(Find("DoorController"), "openDuration", 0.1f);
+            yield return PointerClick(Field<UnityEngine.UI.Button>(rushShortcut, "button"));
+            yield return WaitFor(() => Property<object>(rush, "Phase").ToString() == "Entering");
+
+            // 잘못된 요청은 진행 중인 돌진을 취소하지 않습니다. 비활성/미등록 이벤트는 UI와 API 양쪽에서 거부합니다.
+            Assert.That((bool)Call(director, "TryRunEventForDevelopment", (object)null), Is.False);
+            windowEvent.enabled = false;
+            yield return null;
+            Assert.That(Field<UnityEngine.UI.Button>(windowShortcut, "button").interactable, Is.False);
+            Assert.That((bool)Call(director, "TryRunEventForDevelopment", windowEvent), Is.False);
+            windowEvent.enabled = true;
+            var entries = MainGameTestEvents.Entries(director);
+            int windowIndex = entries.Cast<object>().ToList().FindIndex(entry => MainGameTestEvents.Event(entry) == windowEvent);
+            var removed = entries[windowIndex];
+            entries.RemoveAt(windowIndex);
+            try { Assert.That((bool)Call(director, "TryRunEventForDevelopment", windowEvent), Is.False); }
+            finally { entries.Insert(windowIndex, removed); }
+            Assert.That(Property<Object>(director, "ActiveEvent"), Is.SameAs(rush));
+            Assert.That(Property<bool>(rush, "IsRunning"), Is.True);
+
+            Set(windowEvent, "knockClip", shortcutTestClip);
+            Set(windowEvent, "afterFirstKnockDelay", 0f);
+            Set(windowEvent, "afterSecondKnockDelay", 0f);
+            Set(windowEvent, "windowOpenSeconds", 0.05f);
+            Set(windowEvent, "peekTransitionSeconds", 0.05f);
+            Set(windowEvent, "watchSeconds", 10f);
+            yield return null;
+            yield return PointerClick(Field<UnityEngine.UI.Button>(windowShortcut, "button"));
+            Assert.That(Property<bool>(rush, "IsRunning"), Is.False);
+            Assert.That(Property<bool>(actor, "IsMoving"), Is.False);
+            Assert.That(Property<bool>(Find("DoorController"), "IsClosed"), Is.True);
+            Assert.That(model.gameObject.activeSelf, Is.False);
+            Vector3 stopped = model.position;
+            yield return new WaitForSeconds(0.1f);
+            Assert.That(model.position, Is.EqualTo(stopped));
+            yield return WaitFor(() => Property<object>(windowEvent, "Phase").ToString() == "Watching");
+            Assert.That(model.gameObject.activeSelf, Is.True);
+            yield return PointerClick(Field<UnityEngine.UI.Button>(footstepsShortcut, "button"));
+            Assert.That(Property<bool>(windowEvent, "IsRunning"), Is.False);
+            Assert.That(Property<bool>(Find("WindowController"), "IsClosed"), Is.True);
+            Assert.That(Field<AudioSource>(windowEvent, "windowSource").isPlaying, Is.False);
+            Assert.That(model.gameObject.activeSelf, Is.False);
         }
 
         [UnityTest]
@@ -132,10 +237,18 @@ namespace GE.MiniGames.PlayModeTests
             // 기존 테스트 Canvas를 잠깐 켜도 같은 EventSystem으로 그 안의 버튼을 처리해야 합니다.
             var page = legacy.GetComponentInChildren(Type.GetType("PageBase, Assembly-CSharp", true), true) as MonoBehaviour;
             page.GetType().GetField("_fakeLoadDuration", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(page, 0f);
+            // 보관된 테스트 Canvas는 Raycaster도 꺼져 있으므로, 입력 수명을 검사할 실행 인스턴스에서만 수신을 활성화합니다.
+            legacy.GetComponent<UnityEngine.UI.GraphicRaycaster>().enabled = true;
             legacy.SetActive(true);
             yield return null;
             yield return null;
             var legacyButton = legacy.GetComponentsInChildren<UnityEngine.UI.Button>().First();
+            // 숨겨 둔 과거 테스트 화면의 버튼은 화면 밖에 배치되어 있습니다. 입력 수명 검증에서는 실행 인스턴스만 빈 화면 모서리로 옮깁니다.
+            Canvas.ForceUpdateCanvases();
+            var legacyCanvas = legacy.GetComponent<Canvas>();
+            Assert.That(RectTransformUtility.ScreenPointToWorldPointInRectangle((RectTransform)legacyCanvas.transform,
+                new Vector2(Screen.width * 0.9f, Screen.height * 0.1f), legacyCanvas.worldCamera, out var legacyPosition), Is.True);
+            legacyButton.transform.position = legacyPosition;
             int legacyClicks = 0;
             legacyButton.onClick.AddListener(() => legacyClicks++);
             yield return PointerClick(legacyButton);
@@ -293,6 +406,13 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That((bool)Call(manager, "TryLoadMiniGameForDevelopment", "MiniGame02"), Is.False);
             Call(tools, "RunNextEventImmediately");
             Call(tools, "OpenSnakeMiniGame");
+            foreach (var shortcut in Field<IEnumerable>(tools, "eventShortcuts"))
+            {
+                var selected = Field<MonoBehaviour>(shortcut, "eventBehaviour");
+                Assert.That((bool)Call(director, "CanRunEventForDevelopment", selected), Is.False);
+                Assert.That((bool)Call(director, "TryRunEventForDevelopment", selected), Is.False);
+                Call(tools, "RunEventImmediately", selected);
+            }
             Assert.That(Property<object>(director, "State").ToString(), Is.EqualTo("Stopped"));
             Assert.That(Property<bool>(manager, "IsTransitioning"), Is.False);
         }
@@ -324,7 +444,10 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(module.leftClick.action.controls.Any(control => control.device == mouse), Is.True);
             Canvas.ForceUpdateCanvases();
             var rect = (RectTransform)button.transform;
-            Vector2 position = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
+            // Overlay와 Camera Canvas의 투영이 다르므로, 기존 테스트 UI도 자신의 렌더링 카메라로 클릭 좌표를 계산합니다.
+            var canvas = button.GetComponentInParent<Canvas>();
+            var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            Vector2 position = RectTransformUtility.WorldToScreenPoint(camera, rect.TransformPoint(rect.rect.center));
             InputSystem.QueueStateEvent(mouse, new MouseState { position = position });
             yield return null;
             yield return null;

@@ -12,7 +12,7 @@ public sealed class MainGameEventDirector : MonoBehaviour
     {
         [SerializeField, InspectorName("이벤트")] private MainGameEventBase eventBehaviour;
         [SerializeField, Min(0), InspectorName("가중치")]
-        [Tooltip("0이면 선택하지 않습니다. 예: 문 방문 65, 창문 등장 10, 발소리 25이면 각각 65%, 10%, 25%입니다.")]
+        [Tooltip("0이면 선택하지 않습니다. 기본값: 일반 문 방문 58, 돌진 방문 7, 창문 등장 10, 발소리 25입니다.")]
         private int weight = 1;
 
         public MainGameEventBase Event => eventBehaviour;
@@ -84,13 +84,20 @@ public sealed class MainGameEventDirector : MonoBehaviour
     // 자동 예약과 개발자 도구가 같은 가중치 선택 경로를 사용합니다. 이전 종류가 다시 선택되는 것도 허용합니다.
     private bool TryStartRandomEvent()
     {
-        activeEvent = SelectEvent(Random.value);
-        if (activeEvent == null)
+        var selected = SelectEvent(Random.value);
+        if (selected == null)
         {
             Debug.LogWarning("[MainGame Event] 실행 가능한 이벤트가 없어 다음 주기에 다시 확인합니다.", this);
             ScheduleNextEvent();
             return false;
         }
+        return TryStartEvent(selected);
+    }
+
+    // 무작위 선택과 개발자 지정 실행 모두 같은 상태 전환을 거칩니다. 완료 뒤의 대기 예약·발각 판정도 기존 경로를 유지합니다.
+    private bool TryStartEvent(MainGameEventBase selected)
+    {
+        activeEvent = selected;
         state = DirectorState.Running;
         secondsUntilNextEvent = 0f;
         if (!activeEvent.TryBegin())
@@ -100,6 +107,27 @@ public sealed class MainGameEventDirector : MonoBehaviour
             return false;
         }
         return true;
+    }
+
+    // 개발자 지정 실행은 확률(0 포함)을 무시하되 등록 여부·참조·활성 상태는 검사합니다. 잘못된 요청이 현재 연출을 취소하면 안 됩니다.
+    public bool CanRunEventForDevelopment(MainGameEventBase requested)
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        return isActiveAndEnabled && miniGameManager != null && !miniGameManager.IsGameOver && !miniGameManager.IsGameFinished &&
+            requested != null && requested.isActiveAndEnabled && requested.CanRun &&
+            eventEntries.Exists(entry => entry != null && entry.Event == requested);
+#else
+        return false;
+#endif
+    }
+
+    // 같은 종류를 다시 눌러도 먼저 Cancel로 공유 문·배우·소리를 정리합니다. 일반 배포 빌드의 직접 호출도 위 검사에서 거부합니다.
+    public bool TryRunEventForDevelopment(MainGameEventBase requested)
+    {
+        if (!CanRunEventForDevelopment(requested)) return false;
+        if (activeEvent != null) activeEvent.Cancel();
+        activeEvent = null;
+        return TryStartEvent(requested);
     }
 
     // 누적 가중치 구간으로 선택합니다. double 합계로 큰 정수들의 덧셈 오버플로를 피하고, 0 가중치는 제외합니다.

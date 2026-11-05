@@ -4,11 +4,22 @@ using UnityEngine;
 [DefaultExecutionOrder(-200)]
 public sealed class MainGameDeveloperTools : MonoBehaviour
 {
+    // 버튼과 이벤트를 Inspector 목록으로 연결합니다. 새 이벤트도 타입별 분기나 전용 메서드 없이 같은 지정 실행 경로를 사용합니다.
+    [System.Serializable]
+    public sealed class EventShortcut
+    {
+        [SerializeField] private UnityEngine.UI.Button button;
+        [SerializeField] private MainGameEventBase eventBehaviour;
+        public UnityEngine.UI.Button Button => button;
+        public MainGameEventBase Event => eventBehaviour;
+    }
+
     [SerializeField] private MiniGameManager miniGameManager;
     [SerializeField] private MainGameEventDirector eventDirector;
     [SerializeField] private GameObject toolsPanel;
     [SerializeField] private UnityEngine.UI.Button menuButton;
     [SerializeField] private UnityEngine.UI.Button nextEventButton;
+    [SerializeField] private System.Collections.Generic.List<EventShortcut> eventShortcuts = new System.Collections.Generic.List<EventShortcut>();
     [SerializeField] private UnityEngine.UI.Button flappyButton;
     [SerializeField] private UnityEngine.UI.Button snakeButton;
     [SerializeField] private UnityEngine.UI.Button dinoButton;
@@ -53,6 +64,10 @@ public sealed class MainGameDeveloperTools : MonoBehaviour
         bool usable = CanUse;
         if (menuButton != null) menuButton.interactable = usable;
         if (nextEventButton != null) nextEventButton.interactable = usable && eventDirector != null && eventDirector.isActiveAndEnabled;
+        // 가중치는 클릭 가능 여부에 사용하지 않습니다. 확률이 낮거나 0인 연출도 개발 중 직접 재현할 수 있어야 합니다.
+        foreach (var shortcut in eventShortcuts)
+            if (shortcut != null && shortcut.Button != null)
+                shortcut.Button.interactable = usable && eventDirector != null && eventDirector.CanRunEventForDevelopment(shortcut.Event);
         bool canSwitch = usable && !miniGameManager.IsTransitioning;
         if (flappyButton != null) flappyButton.interactable = canSwitch;
         if (snakeButton != null) snakeButton.interactable = canSwitch;
@@ -70,6 +85,13 @@ public sealed class MainGameDeveloperTools : MonoBehaviour
     public void RunNextEventImmediately()
     {
         if (CanUse && eventDirector != null) eventDirector.TryRunNextEventImmediately();
+        RefreshButtons();
+    }
+
+    // 각 버튼 OnClick에 해당 이벤트를 Object 인자로 미리 저장합니다. UI는 추첨 목록·진행도·미니게임 상태를 수정하지 않습니다.
+    public void RunEventImmediately(MainGameEventBase selected)
+    {
+        if (CanUse && eventDirector != null) eventDirector.TryRunEventForDevelopment(selected);
         RefreshButtons();
     }
 
