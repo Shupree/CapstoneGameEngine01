@@ -7,6 +7,7 @@ namespace GE.Rendering
 {
     // RetroScreenRendererFeature가 읽는 설정값.
     // Volume 프로필에 Override(GE/Retro Screen)로 추가하면 씬·카메라별로 켜고 끄거나 값을 섞을 수 있다.
+    // 카메라에 RetroScreenCamera 컴포넌트가 있으면 그 컴포넌트가 우선한다(Volume 모드일 때만 이 값을 읽는다).
     [Serializable, VolumeComponentMenu("GE/Retro Screen")]
     [SupportedOnRenderPipeline(typeof(UniversalRenderPipelineAsset))]
     public sealed class RetroScreenVolume : VolumeComponent
@@ -50,12 +51,10 @@ namespace GE.Rendering
 
         // 렌더러 피처가 패스를 추가할지 판단할 때 호출한다.
         // 모든 값이 기본값이면 화면 변화가 없으므로 전체 화면 블릿 비용을 쓰지 않는다.
+        // 판정 조건은 카메라 컴포넌트와 같도록 RetroScreenSettings.HasVisibleEffect를 공유한다.
         public bool IsActive()
         {
-            return active && (curvature.value > 0f || pixelSize.value > 1
-                || redLevels.value > 0 || greenLevels.value > 0 || blueLevels.value > 0
-                || dither4.value > 0f || dither8.value > 0f || desaturation.value > 0f
-                || tint.value != Color.white || scanlineIntensity.value > 0f || vignette.value > 0f);
+            return active && RetroScreenSettings.FromVolume(this).HasVisibleEffect;
         }
     }
 }
