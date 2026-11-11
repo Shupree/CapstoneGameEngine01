@@ -111,12 +111,37 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator CameraDrag_StartingOnDeveloperToolsDoesNotRotateTheRoom()
+        {
+            yield return Keys(Key.LeftShift);
+            var look = Find("MainGameCameraLookController");
+            Assert.That(Property<bool>(look, "CanLook"), Is.True);
+            var menu = Field<UnityEngine.UI.Button>(tools, "menuButton");
+            Vector2 menuPoint = ButtonScreenPosition(menu);
+            var roomPoint = new Vector2(Screen.width * 0.65f, Screen.height * 0.55f);
+
+            // 실제 UI 위에서 버튼을 누르고 방으로 끌어도 시작점의 입력 소유권을 유지해야 합니다.
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = menuPoint });
+            yield return null;
+            yield return null;
+            Assert.That(EventSystem.current.IsPointerOverGameObject(mouse.deviceId), Is.True);
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = menuPoint, buttons = 1 });
+            yield return null;
+            yield return null;
+            InputSystem.QueueStateEvent(mouse, new MouseState { position = roomPoint, delta = roomPoint - menuPoint, buttons = 1 });
+            yield return null;
+            yield return null;
+            Assert.That(Property<float>(look, "CurrentLookAmount"), Is.Zero);
+        }
+
+        [UnityTest]
         public IEnumerator SpecificEventButtons_UseMouse_IgnoreWeights_AndPreserveMiniGameProgress()
         {
             yield return Keys(Key.LeftShift);
             yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "menuButton"));
             var shortcuts = Field<IEnumerable>(tools, "eventShortcuts").Cast<object>().ToArray();
-            Assert.That(shortcuts.Length, Is.EqualTo(4));
+            // 옷장 이벤트까지 실제 패널에서 클릭할 수 있어야 합니다.
+            Assert.That(shortcuts.Length, Is.EqualTo(5));
             var entries = MainGameTestEvents.Entries(director);
             // 가중치 0인 연출도 직접 재현하되 버튼이 제품 확률이나 현재 미니게임을 바꾸지 않아야 합니다.
             foreach (var entry in entries) MainGameTestEvents.SetWeight(entry, 0);
@@ -334,12 +359,13 @@ namespace GE.MiniGames.PlayModeTests
         [UnityTest]
         public IEnumerator DinoAndSortingButtons_OpenReadyGames_AndPreserveMainGameProgress()
         {
-            Click("menuButton");
-            yield return null;
+            // 패널이 열린 뒤 텍스트가 렌더링될 프레임을 거쳐 실제 포인터로 이벤트를 실행합니다.
+            yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "menuButton"));
             Set(manager, "currentLives", 2);
             Set(manager, "currentClearedCount", 6);
-            Click("nextEventButton");
+            yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "nextEventButton"));
             var activeEvent = Property<Object>(director, "ActiveEvent");
+            Assert.That(activeEvent, Is.SameAs(visit));
 
             // 기존 UI 스타일을 복제한 두 버튼의 실제 클릭 연결·Ready 상태·Space 시작을 함께 검증합니다.
             foreach (var entry in new[] { (button: "dinoButton", scene: "MiniGame04"), (button: "sortingButton", scene: "MiniGame03") })
@@ -442,12 +468,7 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(module.isActiveAndEnabled, Is.True);
             Assert.That(module.leftClick.action.enabled, Is.True);
             Assert.That(module.leftClick.action.controls.Any(control => control.device == mouse), Is.True);
-            Canvas.ForceUpdateCanvases();
-            var rect = (RectTransform)button.transform;
-            // Overlay와 Camera Canvas의 투영이 다르므로, 기존 테스트 UI도 자신의 렌더링 카메라로 클릭 좌표를 계산합니다.
-            var canvas = button.GetComponentInParent<Canvas>();
-            var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            Vector2 position = RectTransformUtility.WorldToScreenPoint(camera, rect.TransformPoint(rect.rect.center));
+            Vector2 position = ButtonScreenPosition(button);
             InputSystem.QueueStateEvent(mouse, new MouseState { position = position });
             yield return null;
             yield return null;
@@ -457,6 +478,16 @@ namespace GE.MiniGames.PlayModeTests
             InputSystem.QueueStateEvent(mouse, new MouseState { position = position });
             yield return null;
             yield return null;
+        }
+
+        private static Vector2 ButtonScreenPosition(UnityEngine.UI.Button button)
+        {
+            Canvas.ForceUpdateCanvases();
+            var rect = (RectTransform)button.transform;
+            // 클릭과 드래그 모두 버튼이 속한 Canvas의 렌더링 카메라로 화면 좌표를 구합니다.
+            var canvas = button.GetComponentInParent<Canvas>();
+            var camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            return RectTransformUtility.WorldToScreenPoint(camera, rect.TransformPoint(rect.rect.center));
         }
 
         // 버튼 연결과 기능 조합의 빠른 검증용 직접 호출입니다. 실제 포인터 경로의 회귀는 위 PointerClick 테스트들이 별도로 담당합니다.

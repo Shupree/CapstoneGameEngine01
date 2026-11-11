@@ -1,11 +1,8 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
@@ -14,7 +11,7 @@ namespace GE.MiniGames.PlayModeTests
 {
     // 저장된 창문·효과음·공용 배우와 기존 게임오버 경로를 함께 검사합니다. 메인 타입의 리플렉션은 테스트 경계에서만 사용합니다.
     [Category("MainGameEventIntegration")]
-    public sealed class MainGameWindowEventTests : InputTestFixture
+    public sealed class MainGameWindowEventTests
     {
         private MonoBehaviour manager, director, windowEvent, window, mother;
         private AudioSource source;
@@ -22,41 +19,7 @@ namespace GE.MiniGames.PlayModeTests
         private Vector3 closedPanelPosition;
         private float originalTimeScale;
         private AudioClip shortClip;
-        private readonly Dictionary<InputActionAsset, InputDevice[]> actionDevices = new Dictionary<InputActionAsset, InputDevice[]>();
         private static readonly BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
-
-        public override void Setup()
-        {
-            // 장치를 교체하기 전에 공유 UI 액션을 해제해야 이전 Control 인덱스를 가진 상태로 새 장치에 접근하지 않습니다.
-            InputSystem.DisableAllEnabledActions();
-            foreach (var asset in Resources.FindObjectsOfTypeAll<InputActionAsset>())
-            {
-                actionDevices[asset] = asset.devices.HasValue ? asset.devices.Value.ToArray() : null;
-                asset.Disable();
-            }
-            base.Setup();
-            var keyboard = InputSystem.AddDevice<Keyboard>();
-            foreach (var asset in actionDevices.Keys)
-            {
-                if (asset == null) continue;
-                asset.devices = new InputDevice[] { keyboard };
-            }
-        }
-
-        public override void TearDown()
-        {
-            // 테스트 장치 제거·실제 장치 복원 전에 액션을 먼저 끕니다. 새로 로드된 씬의 액션도 함께 정리합니다.
-            InputSystem.DisableAllEnabledActions();
-            foreach (var asset in Resources.FindObjectsOfTypeAll<InputActionAsset>()) asset.Disable();
-            base.TearDown();
-            foreach (var item in actionDevices)
-            {
-                if (item.Key == null) continue;
-                item.Key.Disable();
-                item.Key.devices = item.Value;
-            }
-            actionDevices.Clear();
-        }
 
         [UnitySetUp]
         public IEnumerator LoadHost()
@@ -67,7 +30,7 @@ namespace GE.MiniGames.PlayModeTests
             yield return null;
             Connect();
             yield return WaitFor(() => !Property<bool>(manager, "IsTransitioning"));
-            // 이 테스트는 발각 시점에 집중합니다. 실제 키 입력 정책은 기존 Pause/Camera 통합 테스트가 검증합니다.
+            // 숨김 상태를 테스트에서 지정하므로 실제 입력 장치와 공유 UI 액션은 교체하지 않습니다.
             manager.enabled = false;
             Field<MiniGameController>(manager, "currentMiniGameController").KeyboardInputEnabled = false;
             Call(director, "StopEvents");

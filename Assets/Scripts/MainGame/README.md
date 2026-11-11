@@ -9,6 +9,7 @@
 - `MotherDoorVisitEvent`: 발걸음 재생, 문과 엄마의 방문 순서, 발각 구간을 관리한다.
 - `MotherDoorRushEvent`: 같은 문 방문 경고 뒤 문 앞에서 뜸을 들이고, 빠르게 왕복하며 짧게 관찰하는 별도 이벤트다.
 - `MotherWindowPeekEvent`: 노크 두 번, 무음 창문 개폐, 수평으로 들이미는 상체·얼굴과 발각 구간을 관리한다.
+- `MotherClosetVisitEvent`: 옷장 소리 세 번, 두 문짝 개폐, 침대 앞 돌진과 방문 퇴장을 관리한다.
 - `MotherFootstepsOnlyEvent`: 같은 발걸음을 끝까지 재생 → 1초 대기 → 같은 발걸음을 다시 끝까지 재생한다. 엄마와 문을 제어하지 않고 발각 판정은 항상 꺼져 있다.
 - `MotherActorController`: 모델의 이동·회전과 Animator의 `Speed`를 제어한다. 일반 방문은 기존 Run을 0.45배로, 돌진은 이벤트가 전달한 속도로 재생한다. 관찰·취소 뒤 Idle은 1배로 복원하며 Root Motion은 사용하지 않는다.
 - `DoorController`: 기존 문 회전 API를 재사용한다.
@@ -16,7 +17,7 @@
 - `MotherAppearance` / `MotherAppearanceProfile`: 모든 엄마의 공통 어두운 외형을 관리한다. 원본 머티리얼의 색·텍스처·알파는 보존하고 인스턴스의 색과 광택을 조절한다.
 - `MiniGameManager`: Shift 숨김 상태를 제공하고 게임오버·전체 재시작을 담당한다. `GameOverTriggered`와 `GameFinished`를 받으면 Director가 진행 중 이벤트와 다음 타이머를 취소한다.
 - `MainGameDeveloperTools`: Editor와 Development Build의 개발자 도구 표시·버튼 상태만 관리한다. 버튼의 실제 동작은 Director와 MiniGameManager의 공통 API에 위임한다.
-- `MainGameCameraLookController`: MainGame 카메라의 시선만 제어한다. 매니저가 제공하는 숨김 상태에서 좌우 키를 받고, 마지막 각도와 양쪽 끝의 시선 제한을 유지한다.
+- `MainGameCameraLookController`: MainGame 카메라의 시선만 제어한다. 미니게임이 숨겨지면 좌우 키와 마우스 드래그를 받는다.
 
 ## 문 방문 순서
 
@@ -42,15 +43,16 @@ MainGame의 `MainGameEvents`를 선택하고 `MainGameEventDirector → 이벤�
 
 | 이벤트 | 가중치 | 현재 선택 확률 |
 | --- | ---: | ---: |
-| MotherDoorVisit | 58 | 58% |
+| MotherDoorVisit | 48 | 48% |
 | MotherDoorRush | 7 | 7% |
 | MotherWindowPeek | 10 | 10% |
+| MotherClosetVisit | 10 | 10% |
 | MotherFootstepsOnly | 25 | 25% |
 
-- 가중치 합이 100이 아니어도 비율로 계산한다. 예를 들어 116:14:20:50도 58%:7%:10%:25%다. 변경은 다음 추첨부터 적용한다.
+- 가중치 합이 100이 아니어도 유효 항목의 비율로 계산한다. 변경은 다음 추첨부터 적용한다.
 - 가중치 0, 비활성, 필수 참조가 없는 이벤트는 선택에서 제외한다. 확률은 남은 유효 항목의 합을 기준으로 계산한다.
 - 기존 단순 `Events` 목록을 가진 씬은 참조를 기본 가중치 1로 한 번만 이전한다. 이미 설정된 새 목록의 가중치는 보존한다.
-- 자동 이벤트와 개발자 도구의 `다음 이벤트 즉시 실행`은 같은 확률 설정을 사용한다. 한 번 추첨할 때마다 독립적으로 선택하므로 짧은 실행 횟수에서 비율이 반드시 58:7:10:25로 맞지는 않는다.
+- 자동 이벤트와 개발자 도구의 `다음 이벤트 즉시 실행`은 같은 확률 설정으로 독립적으로 추첨한다.
 
 ## 문 앞에서 뜸을 들인 뒤 돌진하는 방문
 
@@ -65,7 +67,15 @@ Step_Walk 실제 재생 종료 → 1초 대기 → 기존 속도로 Door_7 열�
 
 Inspector의 `돌진 전 대기 시간 (초)`와 `관찰 시간 (초)`는 각각 기본 1초다. `돌진 이동 속도`는 기본 8.25이며 진입·퇴장 모두에 적용한다. `Run 재생 속도`는 기본 1배다. 이동 속도와 애니메이션 속도는 `FollowPath`의 이번 호출에만 전달하므로, 일반 방문의 기본 1.2 및 Run 0.45배를 변경하지 않는다.
 
-발각은 일반 문 방문과 동일하게 **문이 열리기 시작한 뒤 1초부터 완전히 닫힐 때까지**다. 문 앞에서 뜸을 들이는 동안도 위험하며 공통 `CaughtByMother`와 기존 `Retry?` 화면을 사용한다. 개발자 즉시 실행·게임오버·목표 달성·씬 종료는 현재 코루틴을 취소하고 소리·배우·문·애니메이션 속도를 정리한다. 문 방문 확률 65% 중 7%p를 이 항목으로 옮겨 일반 방문은 58%다.
+발각은 일반 문 방문과 동일하게 **문이 열리기 시작한 뒤 1초부터 완전히 닫힐 때까지**다. 문 앞에서 뜸을 들이는 동안도 위험하며 공통 `CaughtByMother`와 기존 `Retry?` 화면을 사용한다. 개발자 즉시 실행·게임오버·목표 달성·씬 종료는 현재 코루틴을 취소하고 소리·배우·문·애니메이션 속도를 정리한다.
+
+## 옷장 등장
+
+`MainGameEvents/MotherClosetVisit`에 옷장 위치의 3D AudioSource와 `Closet_Sound`를 연결했다. 앞의 두 소리는 AudioSource 음량의 75%로 재생하며, 첫 소리가 끝난 뒤 `Quiet Sound Interval`(기본 0.5초)을 기다린다. 두 번째 소리가 끝나면 `Reveal Delay`(1초) 뒤 세 번째 소리를 원래 음량으로 재생하면서 옷장을 열고 엄마를 표시한다.
+
+문틈으로 엄마가 보이면 `Before Rush Delay`(0.5초)를 세기 시작한다. 이 시간이 지나고 문짝이 열린 뒤 엄마가 침대 앞으로 달려가 `Watch Seconds`(1초) 동안 멈춘다. 엄마가 침대 앞을 떠날 때 옷장 문짝이 닫히기 시작한다. 엄마는 방문 앞에서 방문을 열고 나간다. 발각은 옷장 문틈으로 엄마가 보일 때부터 방문을 완전히 닫을 때까지다.
+
+`Map/Wardrobe`의 `ClosetDoors`에서 문짝의 열림 각도와 개폐 시간을 조절한다. `MainGameEvents/ClosetVisitWaypoints`의 `InsideCloset`은 등장 지점이고 `ClosetThreshold`는 옷장에서 방으로 나오는 지점이다. 개발자 도구의 `옷장 등장 즉시 실행`으로 재현할 수 있다.
 
 ## 발소리만 들리는 연출
 
@@ -102,7 +112,7 @@ Knock_Window 재생 종료
 
 ## 엄마의 공통 어두운 외형
 
-`Assets/_Art/Settings/MotherDarkAppearance.asset`의 `Tint`(기본 RGB 0.10)와 `Maximum Smoothness`(기본 0.08)를 조절한다. `MotherRealistic`과 `Mother` 프리팹의 `MotherAppearance`가 같은 프로필을 참조하므로 문·창문 등 모든 등장에 적용된다. MainGame의 공유 배우 인스턴스도 이 설정을 따른다.
+`Assets/_Art/Settings/MotherDarkAppearance.asset`의 `Tint`(기본 RGB 0.15)와 `Maximum Smoothness`(기본 0.08)를 조절한다. `MotherRealistic`과 `Mother` 프리팹의 `MotherAppearance`가 같은 프로필을 참조하므로 모든 등장에 적용된다. MainGame의 공유 배우 인스턴스도 이 설정을 따른다.
 
 색은 원래 피부·옷·머리 색에 곱하고, 눈·피부 등의 광택을 제한하며 발광 색을 검정으로 만든다. `MaterialPropertyBlock`을 사용하므로 원본 공유 머티리얼이나 텍스처를 변형하지 않는다. 알파 값과 눈썹·속눈썹의 클리핑은 유지한다. 편집 화면에서도 적용되며 비활성화·컴포넌트 제거 시 기존 PropertyBlock을 복원한다.
 
@@ -113,6 +123,7 @@ Knock_Window 재생 종료
 - `MotherDoorRush`: 공유 문·배우·경로 참조, 돌진 전 대기·관찰 시간, 왕복 이동 속도와 Run 재생 속도.
 - `MotherActor`: 모델/Animator 참조, 이동 속도, 회전 속도, Run 재생 속도.
 - `DoorVisitWaypoints`: 문 밖, 문턱, 문 안, 방 통로, 침대 옆, 플레이어 시선 목표. 방 배치를 바꾸면 경로가 가구와 겹치지 않도록 함께 조정한다. 지점의 높이는 발이 닿을 바닥 높이로 맞춘다.
+- 침대 앞 정지 위치는 `MainGameEvents/DoorVisitWaypoints/Bedside`의 `Transform → Position`이다. 일반 방문·돌진 방문·옷장 등장이 이 지점을 공유한다. 특정 이벤트만 옮기려면 별도 지점을 만들어 일반·돌진의 `Entry Path` 또는 옷장의 `Approach Bed Path` 마지막 항목에 연결한다.
 
 엄마 프리팹 인스턴스는 편집 시 비활성으로 저장하고 이벤트가 시작할 때 표시한다. 두 엄마 프리팹에는 공통 외형 컴포넌트를 연결했으며 이동·방문 자세는 씬의 지점으로 구성한다. 기존 Animator Controller는 유지한다.
 
@@ -120,7 +131,7 @@ Inspector의 `Interval Seconds`와 **문 방문 이벤트의** `Watch Seconds`�
 
 ## 개발자 도구
 
-MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. 사용자가 추가한 배경 스타일을 유지하며, `[개발자 도구]`를 누르면 아홉 버튼을 펼치거나 접는다. UI를 열어도 게임은 계속 진행된다. 새 버튼도 기존 텍스트 버튼을 복제하며 별도 Image는 사용하지 않는다.
+MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. 사용자가 추가한 배경 스타일을 유지하며, `[개발자 도구]`를 누르면 열 개 버튼을 펼치거나 접는다. UI를 열어도 게임은 계속 진행된다. 새 버튼도 기존 텍스트 버튼을 복제하며 별도 Image는 사용하지 않는다.
 
 MainGame의 기존 `EventSystem`은 **씬 최상위**에 둔다. 숨길 수 있는 테스트 Canvas `UIsRoot` 아래에 두면 Canvas 비활성화와 함께 입력 모듈도 꺼져, 다른 Canvas의 개발자 도구·Retry 버튼까지 클릭되지 않는다. Canvas의 표시 상태와 입력 시스템 수명을 분리하고, Additive 미니게임의 EventSystem은 기존 매니저 정책대로 비활성화해 활성 시스템을 하나로 유지한다.
 
@@ -130,6 +141,7 @@ MainGame의 기존 `EventSystem`은 **씬 최상위**에 둔다. 숨길 수 있�
 | 문 방문 즉시 실행 | 현재 연출을 취소한 뒤 일반 문 방문을 확정 실행한다. |
 | 돌진 방문 즉시 실행 | 현재 연출을 취소한 뒤 문 앞에서 뜸을 들이고 달려오는 방문을 확정 실행한다. |
 | 창문 등장 즉시 실행 | 현재 연출을 취소한 뒤 침대 옆 창문 등장 연출을 확정 실행한다. |
+| 옷장 등장 즉시 실행 | 현재 연출을 취소한 뒤 옷장 등장과 방문 퇴장을 확정 실행한다. |
 | 발소리만 즉시 실행 | 현재 연출을 취소한 뒤 발소리만 들리는 안전한 연출을 확정 실행한다. |
 | 플래피버드 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame02를 새로 로드한다. Space 입력 전에는 Ready 상태다. |
 | 스네이크 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame01을 새로 로드한다. 같은 스네이크를 선택해도 새 인스턴스로 교체한다. |
@@ -169,7 +181,7 @@ Shift를 놓으면 화면이 돌아오고 기존 Tab 상태를 유지한다. 숨
 
 ## 좌우 시선 조작
 
-`Base/Main Camera`에 `MainGameCameraLookController`를 미리 배치하고 같은 씬의 MiniGameManager를 연결한다. **Shift로 미니게임 화면을 숨긴 동안만** 화살표를 누르는 시간만큼 수평으로 부드럽게 회전한다. 왼쪽 키는 책상·모니터 방향, 오른쪽 키는 창문 방향이다. 두 키를 함께 누르거나 키를 놓으면 정지한다. 화면을 다시 올려도 마지막 시선을 유지하며, 전체 MainGame을 Retry할 때 최초 시선으로 돌아온다.
+`Base/Main Camera`에 `MainGameCameraLookController`를 미리 배치하고 같은 씬의 MiniGameManager를 연결한다. **Shift로 미니게임 화면을 숨긴 동안** 좌우 화살표를 누르거나, 방 화면에서 마우스 왼쪽 버튼을 누른 채 가로로 드래그한다. 왼쪽은 책상·모니터 방향, 오른쪽은 창문 방향이다. 드래그는 마우스가 가로로 움직이는 프레임에 화살표와 같은 각속도와 좌우 한계를 적용한다. UI에서 시작한 드래그는 UI 입력으로 처리하고, 두 입력이 겹치면 화살표를 우선한다. 화면을 다시 올리면 마지막 시선을 유지하며, 전체 MainGame을 Retry할 때 최초 시선으로 돌아온다.
 
 Inspector에서 다음 항목을 조절한다.
 
@@ -179,6 +191,6 @@ Inspector에서 다음 항목을 조절한다.
 
 카메라 위치·최초 상하 각도·기울기·시야각과 Additive 미니게임 카메라는 유지한다. 창틀 전체를 보이게 하기 위한 자동 상향 회전과 FOV 보정은 제거했다. Tab 정지, 엄마 이벤트, 목숨과 누적 클리어 수도 이 컴포넌트의 책임이 아니다. 매니저의 Update와 Director의 발각 판정 뒤 LateUpdate에서 회전하며, 게임오버·목표 달성 뒤에는 시선 입력을 받지 않는다. 미니게임 교체 중에도 숨김 상태라면 조작할 수 있다. Inspector 각도는 현재 방 배치와 가로 화면을 기준으로 설정했다.
 
-PlayMode `MainGameCameraLookTests`는 실제 키의 좌우 방향·양끝 제한·각도 유지·수평 회전과 FOV 고정·좌우 및 정면 통과 시 각속도 일치·Tab 정지와 메인 시간·미니게임 교체·전체 재시작을 검증한다.
+PlayMode `MainGameCameraLookTests`는 좌우 키와 마우스 드래그의 방향·각속도·양끝 제한, 수평 회전과 FOV, Tab 정지와 메인 시간, 미니게임 교체 및 전체 재시작을 검증한다. `MainGameDeveloperToolsTests`는 UI에서 시작한 드래그가 시선을 돌리지 않는지도 검증한다.
 
-PlayMode의 `MainGameMotherEventIntegrationTests`, `MainGameDoorRushEventTests`, `MainGameFootstepsEventTests`, `MainGameWindowEventTests`, `MainGameDeveloperToolsTests`는 `MainGameEventIntegration` 카테고리로 실행한다. 저장된 58:7:10:25 설정·가중치 경계, 돌진의 뜸·관찰 시간과 왕복 속도·일반 방문 속도 보존, 노크와 대기 순서·무음 개폐, 수평 상체의 방 안 진입, 문·창문 발각 구간과 Retry, 단계별 취소, 공통 외형, 개발자 버튼을 검증한다. `MiniGamePauseIntegrationTests`는 입력·숨김 조합을 검증한다. 목표 18회 달성 시 이벤트는 중단되지만 엔딩 화면은 별도 구현 영역이다.
+PlayMode의 `MainGameEventIntegration` 카테고리는 48:7:10:10:25 가중치 경계, 문 방문과 돌진, 창문 개폐와 등장 자세, 옷장의 음량·정지 위치·방문 퇴장, 발각과 취소, 공통 외형, 개발자 버튼을 검증한다. `MiniGamePauseIntegrationTests`는 입력·숨김 조합을 검증한다. 목표 18회 달성 시 이벤트는 중단되지만 엔딩 화면은 별도 구현 영역이다.

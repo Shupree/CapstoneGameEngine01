@@ -5,7 +5,8 @@ using UnityEngine;
 public sealed class MotherAppearanceProfile : ScriptableObject
 {
     [Tooltip("원래 피부·머리·옷 색에 곱할 색입니다. RGB가 낮을수록 검정에 가까워지며 알파 클리핑은 유지됩니다.")]
-    [SerializeField, ColorUsage(false, false)] private Color tint = new Color(0.10f, 0.10f, 0.10f, 1f);
+    // 기존 0.10 배율을 1.5배로 올려 어두운 방에서도 얼굴과 실루엣을 구별하기 쉽게 합니다.
+    [SerializeField, ColorUsage(false, false)] private Color tint = new Color(0.15f, 0.15f, 0.15f, 1f);
     [Tooltip("피부·눈·옷의 최대 광택입니다. 밝은 반사가 실루엣을 방해하지 않도록 제한합니다.")]
     [SerializeField, Range(0f, 1f)] private float maximumSmoothness = 0.08f;
 

@@ -71,7 +71,7 @@ Lobby
 | `Assets/Scripts/MainGame/DoorController.cs` | 기존 경첩 회전과 Open/Close/IsOpen/IsClosed API. 입력과 발각 판정은 외부 책임이다. |
 | `Assets/Scripts/MainGame/MainGameDeveloperTools.cs` | Editor·Development Build 전용 텍스트 버튼 UI. 이벤트 즉시 실행과 지정 미니게임 로드를 매니저 API에 위임한다. |
 | `Assets/Scripts/MainGame/MiniGameScreenGlow.cs` | `Base/MiniGameScreenLight`(Point Light)에 붙어 미니게임 viewport의 평균 색을 화면 복사·비동기 읽기로 샘플링해 조명 색·세기로 옮긴다. 매니저는 Inspector 참조로 조회만 하며(`IsMiniGameHidden`, `MiniGameViewportRect`), 숨김·게임오버·미니게임 없음이면 꺼진다. 방 주변광·달빛 값은 [셰이더 가이드 9장](Assets/Rendering/RetroScreen/SHADER_GUIDE.md)을 따른다. |
-| `Assets/Scripts/MainGame/MainGameCameraLookController.cs` | MainGame 카메라의 좌우 시선. Shift 숨김에서만 화살표 입력을 받고 마지막 각도를 유지한다. Inspector의 끝 각도와 좌우 공통 각속도를 사용한다. |
+| `Assets/Scripts/MainGame/MainGameCameraLookController.cs` | MainGame 카메라의 좌우 시선. Shift 숨김에서 화살표와 마우스 왼쪽 드래그를 받고 마지막 각도를 유지한다. Inspector의 끝 각도와 좌우 공통 각속도를 사용한다. |
 | `Assets/Scripts/MiniGames/Common` | `IMiniGame`, `MiniGameController`, 결과·상태 계약, 단독 실행용 UI. 변경 시 모든 미니게임에 미칠 영향을 확인한다. |
 | `Assets/Scripts/MiniGames/Snake` | 스네이크 규칙·로컬 실행·화면 표시. 전체 목숨이나 다음 씬을 직접 관리하지 않는다. |
 | `Assets/Scripts/MiniGames/Editor` | Editor 전용 씬 구성·검증 도구. 런타임 코드와 분리한다. |
@@ -186,14 +186,16 @@ MainGame
 - 미니게임 카메라는 매니저가 지정하는 viewport를 따른다. 현재 기본값은 `(0.15, 0.15, 0.7, 0.7)`, depth는 `1`이다. 전체 화면으로 덮어쓰지 않는다.
 - 새 미니게임 카메라가 `Camera.main` 선택을 방해하지 않도록 태그를 확인한다. 카메라·Canvas·조명·오디오 등 Additive 씬 간 간섭을 함께 확인한다.
 - `Base/Main Camera`의 시선은 `MainGameCameraLookController`가 담당한다. 위치·상하 각도·기울기·FOV·미니게임 카메라는 유지하며 Y축만 회전한다. Inspector의 `Left Yaw Offset`(음수, 책상)과 `Right Yaw Offset`(양수, 창문)으로 한계를 조절한다. `Rotation Speed Degrees Per Second`는 좌우 공통 각속도이며 기존 책상 속도인 약 66.89도/초를 기준으로 한다. 양끝까지 같은 시간을 쓰는 정규화 이동으로 되돌리면 좌우 속도가 달라지므로 실제 각도를 초당 일정하게 이동한다. 자동 상향 회전·FOV 보정을 다시 추가하지 않는다. 화면 재표시·미니게임 교체는 마지막 시선을 유지하고 전체 Retry에서만 최초 구도로 돌아온다.
+- Shift로 미니게임을 숨겼을 때 방 화면에서 시작한 마우스 왼쪽 드래그도 방향키와 같은 각속도 및 좌우 한계를 쓴다. 가로 델타는 방향 판정에 쓰고, UI에서 시작한 입력은 카메라 드래그에서 제외한다.
 - 씬 구성 도구를 실행하기 전에 기존 씬의 저장 상태를 확인한다. 기존 씬을 파괴하고 다시 만들어 UI 문제를 해결하지 않는다.
 
 ## 9. Unity 환경과 연결 문제
 
 - 개발자 도구는 MainGame의 `DeveloperToolsCanvas`에 미리 배치한다. 일반 빌드에서는 숨긴다. 강제 미니게임 교체는 목숨·클리어 수·엄마 이벤트를 보존하고 Space 시작 대기로 연다. 이벤트 즉시 실행은 기존 이벤트를 취소한 뒤 무작위 실행한다.
 - 이벤트 간격과 침대 관찰 시간의 Inspector 설정 위치·개발자 도구 동작은 [MainGame 가이드](Assets/Scripts/MainGame/README.md)를 따른다.
-- 개발자 도구에는 무작위 실행 외에 네 이벤트의 지정 실행 버튼이 있다. `eventShortcuts` 목록으로 버튼·이벤트를 연결하고 OnClick에 `RunEventImmediately(MainGameEventBase)`와 대상을 저장한다. Director의 `TryRunEventForDevelopment`는 가중치를 무시하되 등록·활성·참조·게임 종료 상태를 검사하고, 유효한 요청만 기존 이벤트를 취소한 뒤 실행한다. 같은 종류도 재실행하며 확률·진행도는 유지한다. 새 이벤트 버튼에 타입별 분기나 전용 메서드를 추가하지 않는다.
-- 현재 이벤트 가중치는 일반 문 방문 58, 돌진 방문 7, 창문 등장 10, 발소리만 25다. Director의 `eventEntries` 목록에서 함께 관리한다. 0/비활성/실행 불가능 항목을 제외한 비율로 선택하며, 기존 `events` 참조 목록은 자동 이전용 숨김 필드로 보존한다. 새 이벤트를 하드코딩 분기로 선택하지 않는다.
+- 개발자 도구에는 무작위 실행 외에 다섯 이벤트의 지정 실행 버튼이 있다. `eventShortcuts` 목록으로 버튼·이벤트를 연결하고 OnClick에 `RunEventImmediately(MainGameEventBase)`와 대상을 저장한다. Director의 `TryRunEventForDevelopment`는 가중치를 무시하되 등록·활성·참조·게임 종료 상태를 검사하고, 유효한 요청만 기존 이벤트를 취소한 뒤 실행한다. 같은 종류도 재실행하며 확률·진행도는 유지한다. 새 이벤트 버튼에 타입별 분기나 전용 메서드를 추가하지 않는다.
+- 현재 이벤트 가중치는 일반 문 방문 48, 돌진 방문 7, 창문 등장 10, 옷장 등장 10, 발소리만 25다. Director의 `eventEntries` 목록에서 함께 관리한다. 0/비활성/실행 불가능 항목을 제외한 비율로 선택하며, 기존 `events` 참조 목록은 자동 이전용 숨김 필드로 보존한다. 새 이벤트를 하드코딩 분기로 선택하지 않는다.
+- 옷장 등장은 `Closet_Sound`를 75% 음량으로 두 번 재생한 뒤 원래 음량과 함께 두 문짝을 연다. 공용 `DoorVisitWaypoints/Bedside`에서 멈춘 뒤 방문으로 나간다. 발각 구간은 옷장 문틈으로 배우가 보일 때부터 방문이 완전히 닫힐 때까지다.
 - `MotherDoorRush`의 뜸·관찰 시간은 기본 각 1초이며 Inspector에서 독립적으로 조절한다. 완전 개방 뒤 뜸을 세지만 발각은 기존처럼 문 열기 시작 +1초부터 완전 닫힘까지다. `MotherActorController.FollowPath`의 속도 인자는 이번 이동에만 적용하며 공유 배우의 기본 이동 속도·Run 속도를 덮어쓰지 않는다. 취소·관찰 시 애니메이션 속도를 복원한다.
 - 창문 이벤트는 침대 옆 `Map/wallWindowSlide/windowBottom`만 움직인다. `MotherWindowPeek`의 두 노크 뒤 대기·관찰·무음 개폐 시간은 각각 Inspector에서 조절한다. `Open_Window`는 어떤 단계에서도 재생하지 않는다. 기존 배우를 `BlendPose`로 수평 자세에 놓아 얼굴과 상체가 방 안으로 나오게 하며, 위치·회전은 `WindowPeekWaypoints`에서 조절한다. 다음 문 이벤트는 자신의 ShowAt 지점으로 서 있는 자세를 복원한다. 엄마가 사라진 후에도 창문이 완전히 닫힐 때까지 발각 구간을 유지하고, 종료·취소 시 소리·배우·창문을 함께 복원한다.
 - 모든 엄마 외형은 `Assets/_Art/Settings/MotherDarkAppearance.asset`을 공유한다. 두 엄마 프리팹의 `MotherAppearance`를 유지하고 피부·머리·옷의 원본 공유 머티리얼을 직접 어둡게 덮어쓰지 않는다. 이 설정은 문 방문과 창문 등장에 함께 적용한다.
@@ -223,10 +225,11 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 | PlayMode `MiniGameLivesIntegrationTests` | 목숨 차감·로컬 재시도·게임오버·전체 재시작·다른 패배 원인 |
 | PlayMode `MainGameMotherEventIntegrationTests` | 실제 소리 종료·문 시작 기준 시간, 침대 관찰·퇴장, 닫힘 중 발각, Tab 상태의 발각, 재시작·목표 달성 시 이벤트 수명 |
 | PlayMode `MainGameDoorRushEventTests` | 기존 문 경고·문 앞 대기·짧은 관찰·왕복 속도, Inspector 시간 적용·일반 방문 속도 보존, 뜸/닫힘 중 발각·Retry·전 단계 취소 |
-| PlayMode `MainGameFootstepsEventTests` | 58:7:10:25 가중치 경계·0/비활성 제외·기존 참조 이전, 원본 소리 두 번 재생·1초 대기·무발각·문/엄마 정지·취소 |
+| PlayMode `MainGameFootstepsEventTests` | 48:7:10:10:25 가중치 경계·0/비활성 제외·기존 참조 이전, 원본 소리 두 번 재생·1초 대기·무발각·문/엄마 정지·취소 |
+| PlayMode `MainGameClosetVisitEventTests` | 세 번의 소리와 음량, 공용 침대 정지 지점, 방문 퇴장, 등장 즉시 발각과 취소 정리 |
 | PlayMode `MainGameWindowEventTests` | 원본 노크·무음 개폐·Inspector 시간, 수평 상체의 방 안 진입, 등장부터 닫힘까지 발각·Retry, 경고/닫힘 후 안전, 전 단계 취소·배우 공유·어두운 외형 |
-| PlayMode `MainGameDeveloperToolsTests` | 버튼 연결·Raycaster, 실제 마우스로 메뉴·네 이벤트 지정 실행·기존 테스트 UI·Retry·재시작 후 클릭, 0 가중치/같은 이벤트 재실행·잘못된 대상 거부·문/창문/공용 배우 취소 정리, 미니게임 Ready 전환·진행도 보존, 종료 시 차단, Inspector 시간 적용 |
-| PlayMode `MainGameCameraLookTests` | 실제 숨김·화살표 방향, 부드러운 수평 회전과 제한, 좌우·정면 통과 각속도 일치, 각도 보존·FOV 고정, Tab 정지·메인 시간·미니게임 교체·전체 재시작 |
+| PlayMode `MainGameDeveloperToolsTests` | 버튼 연결·Raycaster, 실제 마우스로 메뉴·다섯 이벤트 지정 실행·기존 테스트 UI·Retry·재시작 후 클릭, 0 가중치/같은 이벤트 재실행·잘못된 대상 거부·문/창문/공용 배우 취소 정리, 미니게임 Ready 전환·진행도 보존, 종료 시 차단, Inspector 시간 적용 |
+| PlayMode `MainGameCameraLookTests` | 실제 숨김, 화살표·마우스 드래그 방향, 부드러운 수평 회전과 제한, 좌우·정면 통과 각속도 일치, 각도 보존·FOV 고정, Tab 정지·메인 시간·미니게임 교체·전체 재시작 |
 
 관련 기능을 수정한 경우 다음을 확인한다.
 

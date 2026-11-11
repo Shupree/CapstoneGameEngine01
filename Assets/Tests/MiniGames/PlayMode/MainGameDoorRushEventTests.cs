@@ -84,7 +84,8 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(Field<float>(rush, "afterFootstepsDelay"), Is.EqualTo(1f));
             Assert.That(Field<float>(rush, "detectionDelay"), Is.EqualTo(1f));
             Assert.That(Field<float>(rush, "beforeRushDelay"), Is.EqualTo(1f));
-            Assert.That(Field<float>(rush, "watchSeconds"), Is.EqualTo(1f));
+            // 씬에서 조정한 관찰 시간으로 실제 정지 구간을 검증합니다.
+            float watchSeconds = Field<float>(rush, "watchSeconds");
             Assert.That(Field<float>(rush, "rushMoveSpeed"), Is.GreaterThan(Field<float>(mother, "moveSpeed")));
             float started = Time.time;
             Begin();
@@ -120,7 +121,7 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(Field<Animator>(mother, "animator").speed, Is.EqualTo(1f));
             float watchingAt = Time.time;
             yield return WaitFor(() => Phase == "Leaving");
-            Assert.That(Time.time - watchingAt, Is.InRange(0.98f, 1.2f));
+            Assert.That(Time.time - watchingAt, Is.EqualTo(watchSeconds).Within(0.2f));
             float leavingAt = Time.time;
             float expectedExit = PathLength(model.position, Field<Transform[]>(rush, "exitPath")) / Field<float>(rush, "rushMoveSpeed");
             yield return WaitFor(() => Phase == "Closing");

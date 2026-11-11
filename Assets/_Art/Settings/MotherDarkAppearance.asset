@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d81ca8cfb5f3c104a8cf6252269928d8, type: 3}
   m_Name: MotherDarkAppearance
   m_EditorClassIdentifier: Assembly-CSharp::MotherAppearanceProfile
-  tint: {r: 0.1, g: 0.1, b: 0.1, a: 1}
+  tint: {r: 0.15, g: 0.15, b: 0.15, a: 1}
   maximumSmoothness: 0.08

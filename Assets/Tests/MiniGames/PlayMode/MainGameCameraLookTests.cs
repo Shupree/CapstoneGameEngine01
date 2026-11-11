@@ -13,12 +13,13 @@ using Object = UnityEngine.Object;
 
 namespace GE.MiniGames.PlayModeTests
 {
-    // 저장된 MainGame 카메라와 실제 Shift·화살표 입력을 함께 검사합니다. 메인 어셈블리 경계는 테스트에서만 리플렉션으로 넘습니다.
+    // 저장된 MainGame 카메라와 실제 Shift·화살표·마우스 입력을 검사합니다. 메인 어셈블리 경계는 테스트에서만 리플렉션으로 넘습니다.
     public sealed class MainGameCameraLookTests : InputTestFixture
     {
         private MonoBehaviour manager, director, look;
         private Camera camera;
         private Keyboard keyboard;
+        private Mouse mouse;
         private float originalTimeScale;
         private readonly Dictionary<InputActionAsset, InputDevice[]> actionDevices = new Dictionary<InputActionAsset, InputDevice[]>();
 
@@ -26,12 +27,13 @@ namespace GE.MiniGames.PlayModeTests
         {
             base.Setup();
             keyboard = InputSystem.AddDevice<Keyboard>();
+            mouse = InputSystem.AddDevice<Mouse>();
             // 씬 UI의 공유 액션도 테스트 장치로 제한하고 종료 때 원래 필터를 복원합니다.
             foreach (var asset in Resources.FindObjectsOfTypeAll<InputActionAsset>())
             {
                 actionDevices[asset] = asset.devices.HasValue ? asset.devices.Value.ToArray() : null;
                 asset.Disable();
-                asset.devices = new InputDevice[] { keyboard };
+                asset.devices = new InputDevice[] { keyboard, mouse };
             }
             originalTimeScale = Time.timeScale;
             Time.timeScale = 1f;
@@ -191,6 +193,57 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator MouseDrag_UsesTheSameSpeedAndYawLimitsAsArrowKeys()
+        {
+            Vector3 position = camera.transform.position;
+            Vector3 angles = camera.transform.localEulerAngles;
+            float fieldOfView = camera.fieldOfView;
+            float speed = Field<float>(look, "rotationSpeedDegreesPerSecond");
+            yield return Keys(Key.LeftShift);
+            var roomPoint = new Vector2(Screen.width * 0.65f, Screen.height * 0.55f);
+            yield return MouseFrame(roomPoint, Vector2.zero, true);
+
+            // 이동량이 다른 좌우 입력도 한 프레임당 각도는 화살표의 공통 속도에 맞습니다.
+            yield return AssertMouseTurn(new Vector2(2f, 0f), speed);
+            yield return AssertMouseTurn(new Vector2(-35f, 0f), -speed);
+            var stationary = camera.transform.localRotation;
+            yield return MouseFrame(mouse.position.ReadValue() + Vector2.up * 10f, Vector2.up * 10f, true);
+            AssertAngle(camera.transform.localRotation, stationary);
+            AssertHorizontalPose(position, angles, fieldOfView);
+
+            Set(look, "rotationSpeedDegreesPerSecond", 500f);
+            yield return DragFor(Vector2.left, 0.3f);
+            Assert.That(Property<float>(look, "CurrentLookAmount"), Is.EqualTo(-1f));
+            yield return DragFor(Vector2.right, 0.4f);
+            Assert.That(Property<float>(look, "CurrentLookAmount"), Is.EqualTo(1f));
+            AssertHorizontalPose(position, angles, fieldOfView);
+            var rightLimit = camera.transform.localRotation;
+            yield return MouseFrame(roomPoint, Vector2.left * 20f, false);
+            AssertAngle(camera.transform.localRotation, rightLimit);
+        }
+
+        [UnityTest]
+        public IEnumerator MouseDrag_StartsOnlyWhileMiniGameIsHidden()
+        {
+            var original = camera.transform.localRotation;
+            var roomPoint = new Vector2(Screen.width * 0.65f, Screen.height * 0.55f);
+            yield return MouseFrame(roomPoint, Vector2.right, true);
+            AssertAngle(camera.transform.localRotation, original);
+            yield return Keys(Key.LeftShift);
+            yield return MouseFrame(roomPoint, Vector2.right, true);
+            AssertAngle(camera.transform.localRotation, original);
+            yield return MouseFrame(roomPoint, Vector2.zero, false);
+
+            // 숨긴 뒤 방에서 새로 시작한 드래그만 받고, 미니게임을 다시 보이면 마지막 시선을 유지합니다.
+            yield return MouseFrame(roomPoint, Vector2.right, true);
+            Assert.That(Property<float>(look, "CurrentLookAmount"), Is.GreaterThan(0f));
+            var last = camera.transform.localRotation;
+            yield return Keys();
+            yield return MouseFrame(roomPoint, Vector2.left, true);
+            AssertAngle(camera.transform.localRotation, last);
+        }
+
+        [UnityTest]
         public IEnumerator LookingWhileTabPaused_PreservesPause_AndMainGameClockKeepsRunning()
         {
             yield return Keys(Key.Space);
@@ -299,6 +352,47 @@ namespace GE.MiniGames.PlayModeTests
             InputSystem.QueueStateEvent(keyboard, new KeyboardState(held));
             yield return null;
             yield return null;
+        }
+
+        // 마우스 델타는 입력 프레임마다 초기화됩니다. LateUpdate가 한 번 처리한 각도를 읽습니다.
+        private IEnumerator AssertMouseTurn(Vector2 delta, float degreesPerSecond)
+        {
+            float startYaw = camera.transform.localEulerAngles.y;
+            QueueMouse(mouse.position.ReadValue() + delta, delta, true);
+            yield return null;
+            float frameSeconds = Time.deltaTime;
+            yield return null;
+            float actual = Mathf.DeltaAngle(startYaw, camera.transform.localEulerAngles.y);
+            Assert.That(actual, Is.EqualTo(degreesPerSecond * frameSeconds).Within(0.05f));
+        }
+
+        private IEnumerator DragFor(Vector2 delta, float seconds)
+        {
+            float deadline = Time.time + seconds;
+            do
+            {
+                QueueMouse(mouse.position.ReadValue() + delta, delta, true);
+                yield return null;
+            }
+            while (Time.time < deadline);
+            yield return null;
+        }
+
+        private IEnumerator MouseFrame(Vector2 position, Vector2 delta, bool pressed)
+        {
+            QueueMouse(position, delta, pressed);
+            yield return null;
+            yield return null;
+        }
+
+        private void QueueMouse(Vector2 position, Vector2 delta, bool pressed)
+        {
+            InputSystem.QueueStateEvent(mouse, new MouseState
+            {
+                position = position,
+                delta = delta,
+                buttons = (ushort)(pressed ? 1 : 0)
+            });
         }
 
         private static void AssertAngle(Quaternion actual, Quaternion expected) => Assert.That(Quaternion.Angle(actual, expected), Is.LessThan(0.01f));
