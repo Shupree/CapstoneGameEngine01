@@ -43,10 +43,11 @@ MainGame의 `MainGameEvents`를 선택하고 `MainGameEventDirector → 이벤�
 
 | 이벤트 | 가중치 | 현재 선택 확률 |
 | --- | ---: | ---: |
-| MotherDoorVisit | 48 | 48% |
+| MotherDoorVisit | 38 | 38% |
 | MotherDoorRush | 7 | 7% |
 | MotherWindowPeek | 10 | 10% |
 | MotherClosetVisit | 10 | 10% |
+| MotherComputerVisit | 10 | 10% |
 | MotherFootstepsOnly | 25 | 25% |
 
 - 가중치 합이 100이 아니어도 유효 항목의 비율로 계산한다. 변경은 다음 추첨부터 적용한다.
@@ -76,6 +77,12 @@ Inspector의 `돌진 전 대기 시간 (초)`와 `관찰 시간 (초)`는 각각
 문틈으로 엄마가 보이면 `Before Rush Delay`(0.5초)를 세기 시작한다. 이 시간이 지나고 문짝이 열린 뒤 엄마가 침대 앞으로 달려가 `Watch Seconds`(1초) 동안 멈춘다. 엄마가 침대 앞을 떠날 때 옷장 문짝이 닫히기 시작한다. 엄마는 방문 앞에서 방문을 열고 나간다. 발각은 옷장 문틈으로 엄마가 보일 때부터 방문을 완전히 닫을 때까지다.
 
 `Map/Wardrobe`의 `ClosetDoors`에서 문짝의 열림 각도와 개폐 시간을 조절한다. `MainGameEvents/ClosetVisitWaypoints`의 `InsideCloset`은 등장 지점이고 `ClosetThreshold`는 옷장에서 방으로 나오는 지점이다. 개발자 도구의 `옷장 등장 즉시 실행`으로 재현할 수 있다.
+
+## 컴퓨터 등장
+
+`MainGameEvents/MotherComputerVisit`에서 `Noise Seconds`(1.5초) 동안 모니터 위치의 3D AudioSource로 `Computer_Noise`를 재생하고, 모니터의 화면 재질 슬롯만 회색으로 바꾼다. `M_ComputerWarningGray`는 MainGame의 RetroScreen 색조를 통과한 최종 화면 기준으로 보정한다. 경고가 끝나면 소리와 화면을 복원하고 엄마가 작은 크기(`Start Scale`)에서 공용 모델의 원래 크기까지 자라면서 책상 끝으로 기어 나온다. `Crawl Seconds`와 `Stand Seconds`로 기어 나오는 시간과 책상 앞 바닥에서 일어서는 시간을 조절한다. 침대 앞에서는 `Watch Seconds`(1초) 동안 관찰한 뒤 `Door_7`을 열어 나간다.
+
+`MainGameEvents/ComputerVisitWaypoints`의 `MonitorOpening`, `DeskEdge`, `StandInFrontOfDesk`가 각각 등장, 기어 나오는 도착점, 바닥에 서는 위치와 회전을 결정한다. 침대 앞 위치는 다른 방문과 같은 `DoorVisitWaypoints/Bedside`를 사용한다. 발각 구간은 모델이 모니터에서 보이기 시작하는 순간부터 방문이 완전히 닫힐 때까지다. 취소 시 소리·모니터 화면·공용 배우의 크기와 관절·방문을 정리한다. 개발자 도구의 `컴퓨터 등장 즉시 실행`으로 재현할 수 있다.
 
 ## 발소리만 들리는 연출
 
@@ -123,7 +130,7 @@ Knock_Window 재생 종료
 - `MotherDoorRush`: 공유 문·배우·경로 참조, 돌진 전 대기·관찰 시간, 왕복 이동 속도와 Run 재생 속도.
 - `MotherActor`: 모델/Animator 참조, 이동 속도, 회전 속도, Run 재생 속도.
 - `DoorVisitWaypoints`: 문 밖, 문턱, 문 안, 방 통로, 침대 옆, 플레이어 시선 목표. 방 배치를 바꾸면 경로가 가구와 겹치지 않도록 함께 조정한다. 지점의 높이는 발이 닿을 바닥 높이로 맞춘다.
-- 침대 앞 정지 위치는 `MainGameEvents/DoorVisitWaypoints/Bedside`의 `Transform → Position`이다. 일반 방문·돌진 방문·옷장 등장이 이 지점을 공유한다. 특정 이벤트만 옮기려면 별도 지점을 만들어 일반·돌진의 `Entry Path` 또는 옷장의 `Approach Bed Path` 마지막 항목에 연결한다.
+- 침대 앞 정지 위치는 `MainGameEvents/DoorVisitWaypoints/Bedside`의 `Transform → Position`이다. 일반 방문·돌진 방문·옷장 등장·컴퓨터 등장이 이 지점을 공유한다. 특정 이벤트만 옮기려면 별도 지점을 만들어 해당 이벤트의 `Entry Path` 또는 `Approach Bed Path` 마지막 항목에 연결한다.
 
 엄마 프리팹 인스턴스는 편집 시 비활성으로 저장하고 이벤트가 시작할 때 표시한다. 두 엄마 프리팹에는 공통 외형 컴포넌트를 연결했으며 이동·방문 자세는 씬의 지점으로 구성한다. 기존 Animator Controller는 유지한다.
 
@@ -131,7 +138,7 @@ Inspector의 `Interval Seconds`와 **문 방문 이벤트의** `Watch Seconds`�
 
 ## 개발자 도구
 
-MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. 사용자가 추가한 배경 스타일을 유지하며, `[개발자 도구]`를 누르면 열 개 버튼을 펼치거나 접는다. UI를 열어도 게임은 계속 진행된다. 새 버튼도 기존 텍스트 버튼을 복제하며 별도 Image는 사용하지 않는다.
+MainGame의 `DeveloperToolsCanvas`에 미리 배치한 텍스트 버튼 UI다. 사용자가 추가한 배경 스타일을 유지하며, `[개발자 도구]`를 누르면 열한 개 버튼을 펼치거나 접는다. UI를 열어도 게임은 계속 진행된다. 새 버튼도 기존 텍스트 버튼을 복제하며 별도 Image는 사용하지 않는다.
 
 MainGame의 기존 `EventSystem`은 **씬 최상위**에 둔다. 숨길 수 있는 테스트 Canvas `UIsRoot` 아래에 두면 Canvas 비활성화와 함께 입력 모듈도 꺼져, 다른 Canvas의 개발자 도구·Retry 버튼까지 클릭되지 않는다. Canvas의 표시 상태와 입력 시스템 수명을 분리하고, Additive 미니게임의 EventSystem은 기존 매니저 정책대로 비활성화해 활성 시스템을 하나로 유지한다.
 
@@ -142,6 +149,7 @@ MainGame의 기존 `EventSystem`은 **씬 최상위**에 둔다. 숨길 수 있�
 | 돌진 방문 즉시 실행 | 현재 연출을 취소한 뒤 문 앞에서 뜸을 들이고 달려오는 방문을 확정 실행한다. |
 | 창문 등장 즉시 실행 | 현재 연출을 취소한 뒤 침대 옆 창문 등장 연출을 확정 실행한다. |
 | 옷장 등장 즉시 실행 | 현재 연출을 취소한 뒤 옷장 등장과 방문 퇴장을 확정 실행한다. |
+| 컴퓨터 등장 즉시 실행 | 현재 연출을 취소한 뒤 컴퓨터 모니터 등장과 방문 퇴장을 확정 실행한다. |
 | 발소리만 즉시 실행 | 현재 연출을 취소한 뒤 발소리만 들리는 안전한 연출을 확정 실행한다. |
 | 플래피버드 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame02를 새로 로드한다. Space 입력 전에는 Ready 상태다. |
 | 스네이크 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame01을 새로 로드한다. 같은 스네이크를 선택해도 새 인스턴스로 교체한다. |
@@ -166,7 +174,7 @@ MainGame의 기존 `EventSystem`은 **씬 최상위**에 둔다. 숨길 수 있�
 4. `OnCancelled`에서 소리·이동·문 등 해당 이벤트가 사용한 자원을 정리한다. 취소 시 성공·실패 결과를 새로 보내지 않는다.
 5. 씬에 배치하고 Director의 `이벤트별 선택 가중치` 목록에 연결하고 비중을 설정한다. Director에 이벤트 타입별 분기문을 추가하지 않는다.
 
-현재 문·창문 이벤트가 `MotherActorController`를 공유한다. 앞으로 다른 등장 방법도 개별 이동 지점과 발각 구간을 가진 이벤트로 추가하면 된다. 같은 배우를 쓰는 이벤트도 Director가 하나씩 실행하므로 겹치지 않는다.
+엄마가 등장하는 이벤트는 `MotherActorController`를 공유한다. 다른 등장 방법도 개별 이동 지점과 발각 구간을 가진 이벤트로 추가하면 된다. Director가 한 번에 한 이벤트를 실행한다.
 
 ## 입력
 
@@ -193,4 +201,4 @@ Inspector에서 다음 항목을 조절한다.
 
 PlayMode `MainGameCameraLookTests`는 좌우 키와 마우스 드래그의 방향·각속도·양끝 제한, 수평 회전과 FOV, Tab 정지와 메인 시간, 미니게임 교체 및 전체 재시작을 검증한다. `MainGameDeveloperToolsTests`는 UI에서 시작한 드래그가 시선을 돌리지 않는지도 검증한다.
 
-PlayMode의 `MainGameEventIntegration` 카테고리는 48:7:10:10:25 가중치 경계, 문 방문과 돌진, 창문 개폐와 등장 자세, 옷장의 음량·정지 위치·방문 퇴장, 발각과 취소, 공통 외형, 개발자 버튼을 검증한다. `MiniGamePauseIntegrationTests`는 입력·숨김 조합을 검증한다. 목표 18회 달성 시 이벤트는 중단되지만 엔딩 화면은 별도 구현 영역이다.
+PlayMode의 `MainGameEventIntegration` 카테고리는 38:7:10:10:10:25 가중치 경계, 문 방문과 돌진, 창문 개폐, 옷장과 컴퓨터의 등장·방문 퇴장, 발각과 취소, 공통 외형, 개발자 버튼을 검증한다. `MiniGamePauseIntegrationTests`는 입력·숨김 조합을 검증한다. 목표 18회 달성 시 이벤트는 중단되지만 엔딩 화면은 별도 구현 영역이다.

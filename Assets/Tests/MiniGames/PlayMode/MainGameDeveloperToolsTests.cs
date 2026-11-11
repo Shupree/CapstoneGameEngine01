@@ -33,7 +33,17 @@ namespace GE.MiniGames.PlayModeTests
         [SetUp]
         public void Setup()
         {
-            // 씬 통합 테스트는 실행 중인 입력 시스템을 유지합니다. 전역 Reset/Disable은 이미 켜진 UI 모듈의 액션을 끄므로 사용하지 않습니다.
+            originalTimeScale = Time.timeScale;
+            originalRunInBackground = Application.runInBackground;
+            originalBackgroundBehavior = InputSystem.settings.backgroundBehavior;
+            // Game 뷰가 비활성일 때도 등록 순간부터 테스트 장치가 입력을 받을 수 있도록 포커스 정책을 먼저 적용합니다.
+            Application.runInBackground = true;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+#if UNITY_EDITOR
+            originalEditorInputBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
+            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+#endif
+            // 실행 중인 입력 시스템과 UI 액션을 유지하면서 실제 장치만 잠시 테스트 장치로 교체합니다.
             foreach (var device in InputSystem.devices.ToArray())
             {
                 if (!device.enabled || !(device is UnityEngine.InputSystem.Pointer || device is Keyboard)) continue;
@@ -42,15 +52,6 @@ namespace GE.MiniGames.PlayModeTests
             }
             keyboard = InputSystem.AddDevice<Keyboard>();
             mouse = InputSystem.AddDevice<Mouse>();
-            originalTimeScale = Time.timeScale;
-            originalRunInBackground = Application.runInBackground;
-            originalBackgroundBehavior = InputSystem.settings.backgroundBehavior;
-            Application.runInBackground = true;
-            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
-#if UNITY_EDITOR
-            originalEditorInputBehavior = InputSystem.settings.editorInputBehaviorInPlayMode;
-            InputSystem.settings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
-#endif
             Time.timeScale = 1f;
         }
 
@@ -140,8 +141,8 @@ namespace GE.MiniGames.PlayModeTests
             yield return Keys(Key.LeftShift);
             yield return PointerClick(Field<UnityEngine.UI.Button>(tools, "menuButton"));
             var shortcuts = Field<IEnumerable>(tools, "eventShortcuts").Cast<object>().ToArray();
-            // 옷장 이벤트까지 실제 패널에서 클릭할 수 있어야 합니다.
-            Assert.That(shortcuts.Length, Is.EqualTo(5));
+            // 컴퓨터 등장까지 실제 패널에서 클릭할 수 있어야 합니다.
+            Assert.That(shortcuts.Length, Is.EqualTo(6));
             var entries = MainGameTestEvents.Entries(director);
             // 가중치 0인 연출도 직접 재현하되 버튼이 제품 확률이나 현재 미니게임을 바꾸지 않아야 합니다.
             foreach (var entry in entries) MainGameTestEvents.SetWeight(entry, 0);
@@ -462,7 +463,8 @@ namespace GE.MiniGames.PlayModeTests
         // 실제 입력 액션 → InputSystemUIInputModule → EventSystem → Button 경로를 밟습니다. onClick/ExecuteEvents를 직접 호출하지 않습니다.
         private IEnumerator PointerClick(UnityEngine.UI.Button button)
         {
-            Assert.That(button.isActiveAndEnabled && button.interactable, Is.True);
+            Assert.That(button.isActiveAndEnabled && button.interactable, Is.True,
+                $"{button.name} 버튼을 클릭할 수 없습니다. 활성={button.isActiveAndEnabled}, 상호작용={button.interactable}");
             Assert.That(EventSystem.current != null && EventSystem.current.isActiveAndEnabled, Is.True);
             var module = EventSystem.current.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
             Assert.That(module.isActiveAndEnabled, Is.True);

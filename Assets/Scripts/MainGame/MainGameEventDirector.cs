@@ -12,7 +12,7 @@ public sealed class MainGameEventDirector : MonoBehaviour
     {
         [SerializeField, InspectorName("이벤트")] private MainGameEventBase eventBehaviour;
         [SerializeField, Min(0), InspectorName("가중치")]
-        [Tooltip("0이면 선택하지 않습니다. 기본값: 일반 문 방문 48, 돌진 방문 7, 창문 등장 10, 옷장 등장 10, 발소리 25입니다.")]
+        [Tooltip("0이면 선택하지 않습니다. 선택 비율은 실행 가능한 이벤트들의 가중치 합을 기준으로 계산합니다.")]
         private int weight = 1;
 
         public MainGameEventBase Event => eventBehaviour;

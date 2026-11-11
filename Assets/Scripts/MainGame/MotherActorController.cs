@@ -12,6 +12,9 @@ public sealed class MotherActorController : MonoBehaviour
     private static readonly int SpeedParameter = Animator.StringToHash("Speed");
     public bool IsMoving { get; private set; }
     public bool IsConfigured => actorRoot != null && animator != null;
+    // 컴퓨터 등장의 임시 크기와 기는 자세에만 사용합니다. 일반 이동과 표시 여부는 이 컨트롤러가 관리합니다.
+    internal Transform ActorRoot => actorRoot;
+    internal Animator ActorAnimator => animator;
 
     private void Awake()
     {

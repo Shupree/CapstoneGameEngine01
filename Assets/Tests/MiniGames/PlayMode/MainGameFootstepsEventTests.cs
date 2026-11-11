@@ -13,7 +13,7 @@ namespace GE.MiniGames.PlayModeTests
     [Category("MainGameEventIntegration")]
     public sealed class MainGameFootstepsEventTests
     {
-        private MonoBehaviour manager, director, footsteps, visit, rush, windowEvent, closetEvent, actor, door;
+        private MonoBehaviour manager, director, footsteps, visit, rush, windowEvent, closetEvent, computerEvent, actor, door;
         private AudioSource source;
         private Transform model;
         private Vector3 originalPosition;
@@ -36,6 +36,7 @@ namespace GE.MiniGames.PlayModeTests
             rush = Find("MotherDoorRushEvent");
             windowEvent = Find("MotherWindowPeekEvent");
             closetEvent = Find("MotherClosetVisitEvent");
+            computerEvent = Find("MotherComputerVisitEvent");
             actor = Find("MotherActorController");
             door = Find("DoorController");
             Assert.That(footsteps, Is.Not.Null);
@@ -73,58 +74,46 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator WeightedSelection_Uses48_7_10_10_25_HandlesZeroDisabledAndBoundaries()
+        public IEnumerator WeightedSelection_ReservesTenPercentForComputer_AndHandlesZeroDisabledAndBoundaries()
         {
             var entries = MainGameTestEvents.Entries(director);
-            Assert.That(entries.Count, Is.EqualTo(5));
-            Assert.That(MainGameTestEvents.Event(entries[0]), Is.SameAs(visit));
-            Assert.That(MainGameTestEvents.Event(entries[1]), Is.SameAs(rush));
-            Assert.That(MainGameTestEvents.Event(entries[2]), Is.SameAs(windowEvent));
-            Assert.That(MainGameTestEvents.Event(entries[3]), Is.SameAs(closetEvent));
-            Assert.That(MainGameTestEvents.Event(entries[4]), Is.SameAs(footsteps));
-            Assert.That(Property<int>(entries[0], "Weight"), Is.EqualTo(48));
-            Assert.That(Property<int>(entries[1], "Weight"), Is.EqualTo(7));
-            Assert.That(Property<int>(entries[2], "Weight"), Is.EqualTo(10));
-            Assert.That(Property<int>(entries[3], "Weight"), Is.EqualTo(10));
-            Assert.That(Property<int>(entries[4], "Weight"), Is.EqualTo(25));
-            int doorCount = 0, rushCount = 0, windowCount = 0, closetCount = 0, footstepsCount = 0;
+            var events = new[] { visit, rush, windowEvent, closetEvent, computerEvent, footsteps };
+            int[] weights = { 38, 7, 10, 10, 10, 25 };
+            int[] counts = new int[events.Length];
+            Assert.That(entries.Count, Is.EqualTo(events.Length));
+            for (int i = 0; i < events.Length; i++)
+            {
+                Assert.That(MainGameTestEvents.Event(entries[i]), Is.SameAs(events[i]));
+                Assert.That(Property<int>(entries[i], "Weight"), Is.EqualTo(weights[i]));
+            }
             // 전체 추첨 구간을 고르게 조사해 임의 표본의 편향 때문에 비율 검증이 흔들리지 않게 합니다.
             for (int i = 0; i < 10000; i++)
             {
-                var selected = Select((i + 0.5f) / 10000f);
-                if (selected == visit) doorCount++;
-                else if (selected == rush) rushCount++;
-                else if (selected == windowEvent) windowCount++;
-                else if (selected == closetEvent) closetCount++;
-                else if (selected == footsteps) footstepsCount++;
-                else Assert.Fail("유효한 이벤트가 선택되지 않았습니다.");
+                int index = Array.IndexOf(events, Select((i + 0.5f) / 10000f));
+                Assert.That(index, Is.GreaterThanOrEqualTo(0));
+                counts[index]++;
             }
-            Assert.That(doorCount, Is.EqualTo(4800));
-            Assert.That(rushCount, Is.EqualTo(700));
-            Assert.That(windowCount, Is.EqualTo(1000));
-            Assert.That(closetCount, Is.EqualTo(1000));
-            Assert.That(footstepsCount, Is.EqualTo(2500));
             Assert.That(Select(0f), Is.SameAs(visit));
-            // 옷장 방문이 10%p를 가져간 새 누적 경계의 양쪽을 검사합니다.
-            Assert.That(Select(0.479999f), Is.SameAs(visit));
-            Assert.That(Select(0.480001f), Is.SameAs(rush));
-            Assert.That(Select(0.549999f), Is.SameAs(rush));
-            Assert.That(Select(0.550001f), Is.SameAs(windowEvent));
-            Assert.That(Select(0.649999f), Is.SameAs(windowEvent));
-            Assert.That(Select(0.650001f), Is.SameAs(closetEvent));
-            Assert.That(Select(0.749999f), Is.SameAs(closetEvent));
+            int cumulative = 0;
+            for (int i = 0; i < events.Length; i++)
+            {
+                Assert.That(counts[i], Is.EqualTo(weights[i] * 100));
+                cumulative += weights[i];
+                if (i + 1 == events.Length) break;
+                // 컴퓨터 등장 추가 이후의 모든 누적 경계 양쪽을 확인합니다.
+                Assert.That(Select(cumulative / 100f - 0.000001f), Is.SameAs(events[i]));
+                Assert.That(Select(cumulative / 100f + 0.000001f), Is.SameAs(events[i + 1]));
+            }
             Assert.That(Select(0.75f), Is.SameAs(footsteps));
             Assert.That(Select(1f), Is.SameAs(footsteps));
             MainGameTestEvents.SetWeight(entries[0], 2);
-            MainGameTestEvents.SetWeight(entries[1], 0);
-            MainGameTestEvents.SetWeight(entries[2], 0);
-            MainGameTestEvents.SetWeight(entries[3], 0);
-            MainGameTestEvents.SetWeight(entries[4], 6);
+            for (int i = 1; i < events.Length - 1; i++) MainGameTestEvents.SetWeight(entries[i], 0);
+            MainGameTestEvents.SetWeight(entries[events.Length - 1], 6);
             Assert.That(Select(0.249f), Is.SameAs(visit));
             Assert.That(Select(0.25f), Is.SameAs(footsteps), "가중치 합이 100이 아니어도 비율로 선택합니다.");
             MainGameTestEvents.SetWeight(entries[0], 0);
             Assert.That(Select(0f), Is.SameAs(footsteps));
-            MainGameTestEvents.SetWeight(entries[0], 48);
+            MainGameTestEvents.SetWeight(entries[0], weights[0]);
             footsteps.enabled = false;
             Assert.That(Select(1f), Is.SameAs(visit));
             MainGameTestEvents.SetWeight(entries[0], 0);
