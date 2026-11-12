@@ -47,7 +47,7 @@ namespace GE.MiniGames.Bomb
             else NotifyChanged();
         }
 
-        // 예약 입력 없이 공통 키 해제 차단을 사용해 시작 Space가 첫 절단으로 이어지지 않게 합니다.
+        // 시작 시 이미 누르고 있던 절단 키는 공통 키 해제 차단이 처리합니다.
         protected override void OnClearInput() { }
         protected override void OnStopGame() { Model = null; }
     }

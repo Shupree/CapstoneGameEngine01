@@ -43,7 +43,7 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator SavedScene_SpaceStarts_TabPausesAndDropsPausedInput()
+        public IEnumerator SavedScene_RStarts_TabPausesAndDropsPausedInput()
         {
             yield return LoadSnakeScene();
             Assert.That(game.State, Is.EqualTo(MiniGameState.Ready));
@@ -52,7 +52,10 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(game.Model.Body[0], Is.EqualTo(readyHead));
             yield return Capture("Ready");
 
+            // 시작 화면은 Space를 넘기고 R을 받습니다.
             yield return Keys(Key.Space);
+            Assert.That(game.State, Is.EqualTo(MiniGameState.Ready));
+            yield return Keys(Key.R);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             yield return Capture("Playing");
             yield return Keys(Key.Tab);
@@ -80,12 +83,12 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator SavedScene_ResultRequiresFreshSpace_HideAndUnloadCleanUp()
+        public IEnumerator SavedScene_ResultRequiresFreshR_HideAndUnloadCleanUp()
         {
             yield return LoadSnakeScene();
             int resultCount = 0;
             game.Completed += result => resultCount++;
-            yield return Keys(Key.Space);
+            yield return Keys(Key.R);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             int firstRun = game.RunId;
             yield return WaitUntilBounded(() => game.State == MiniGameState.Failed, 4f,
@@ -94,12 +97,12 @@ namespace GE.MiniGames.PlayModeTests
             yield return Capture("Result");
             yield return new WaitForSecondsRealtime(0.15f);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
-            Assert.That(game.RunId, Is.EqualTo(firstRun), "Held Space from gameplay must not retry.");
-            yield return Keys(Key.Space, Key.Tab);
+            Assert.That(game.RunId, Is.EqualTo(firstRun), "플레이 중부터 누른 R은 재시도로 이어지지 않아야 합니다.");
+            yield return Keys(Key.R, Key.Tab);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed), "Tab cannot resume a terminal game.");
 
             yield return Keys();
-            yield return Keys(Key.Space);
+            yield return Keys(Key.R);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             Assert.That(game.RunId, Is.EqualTo(firstRun + 1));
             Assert.That(game.Progress, Is.Zero);

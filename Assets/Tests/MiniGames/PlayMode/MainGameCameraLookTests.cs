@@ -193,7 +193,7 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator MouseDrag_UsesTheSameSpeedAndYawLimitsAsArrowKeys()
+        public IEnumerator MouseDrag_ReversesDirectionAndMovesAt150PercentOfArrowSpeed()
         {
             Vector3 position = camera.transform.position;
             Vector3 angles = camera.transform.localEulerAngles;
@@ -203,18 +203,18 @@ namespace GE.MiniGames.PlayModeTests
             var roomPoint = new Vector2(Screen.width * 0.65f, Screen.height * 0.55f);
             yield return MouseFrame(roomPoint, Vector2.zero, true);
 
-            // 이동량이 다른 좌우 입력도 한 프레임당 각도는 화살표의 공통 속도에 맞습니다.
-            yield return AssertMouseTurn(new Vector2(2f, 0f), speed);
-            yield return AssertMouseTurn(new Vector2(-35f, 0f), -speed);
+            // 오른쪽으로 끌면 시선은 왼쪽으로 돌고, 서로 다른 픽셀 이동량에도 화살표 속도의 1.5배를 사용합니다.
+            yield return AssertMouseTurn(new Vector2(2f, 0f), -speed * 1.5f);
+            yield return AssertMouseTurn(new Vector2(-35f, 0f), speed * 1.5f);
             var stationary = camera.transform.localRotation;
             yield return MouseFrame(mouse.position.ReadValue() + Vector2.up * 10f, Vector2.up * 10f, true);
             AssertAngle(camera.transform.localRotation, stationary);
             AssertHorizontalPose(position, angles, fieldOfView);
 
             Set(look, "rotationSpeedDegreesPerSecond", 500f);
-            yield return DragFor(Vector2.left, 0.3f);
+            yield return DragFor(Vector2.right, 0.3f);
             Assert.That(Property<float>(look, "CurrentLookAmount"), Is.EqualTo(-1f));
-            yield return DragFor(Vector2.right, 0.4f);
+            yield return DragFor(Vector2.left, 0.4f);
             Assert.That(Property<float>(look, "CurrentLookAmount"), Is.EqualTo(1f));
             AssertHorizontalPose(position, angles, fieldOfView);
             var rightLimit = camera.transform.localRotation;
@@ -236,7 +236,7 @@ namespace GE.MiniGames.PlayModeTests
 
             // 숨긴 뒤 방에서 새로 시작한 드래그만 받고, 미니게임을 다시 보이면 마지막 시선을 유지합니다.
             yield return MouseFrame(roomPoint, Vector2.right, true);
-            Assert.That(Property<float>(look, "CurrentLookAmount"), Is.GreaterThan(0f));
+            Assert.That(Property<float>(look, "CurrentLookAmount"), Is.LessThan(0f));
             var last = camera.transform.localRotation;
             yield return Keys();
             yield return MouseFrame(roomPoint, Vector2.left, true);
@@ -244,9 +244,59 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
+        public IEnumerator Heartbeat_FollowsShiftAndDetectionWindow_AndStopsOnGameOver()
+        {
+            var heartbeat = Find("MainGameHeartbeat").GetComponent<AudioSource>();
+            var computer = Find("MotherComputerVisitEvent");
+            Set(computer, "noiseSeconds", 0.4f);
+            Assert.That(heartbeat.loop, Is.True);
+            Assert.That(heartbeat.playOnAwake || heartbeat.isPlaying, Is.False);
+            float baseVolume = heartbeat.volume;
+            // 기존 안전 구간 음량에서 25%를 추가로 줄인 값을 확인합니다.
+            float safeVolume = baseVolume * 0.75f * 0.75f;
+
+            yield return Keys(Key.LeftShift);
+            var clip = heartbeat.clip;
+            Assert.That(clip.name, Is.EqualTo("Heartbeat_Fast"));
+            Assert.That(heartbeat.isPlaying, Is.True);
+            Assert.That(heartbeat.volume, Is.EqualTo(safeVolume).Within(0.0001f));
+            Assert.That(heartbeat.volume, Is.LessThan(Field<AudioSource>(computer, "computerSource").volume));
+            // 루프 중간으로 옮겨 구간이 바뀌어도 박동이 처음부터 다시 재생되지 않는지 확인합니다.
+            int middleSample = clip.samples / 2;
+            heartbeat.timeSamples = middleSample;
+            Assert.That((bool)Call(director, "TryRunEventForDevelopment", computer), Is.True);
+            yield return null;
+            // 경고음이 끝나고 실제 발각 구간에 들어갈 때 기준 음량으로 바뀝니다.
+            Assert.That(heartbeat.volume, Is.EqualTo(safeVolume).Within(0.0001f));
+            yield return WaitFor(() => Property<bool>(director, "IsDetectionActive"));
+            yield return null;
+            Assert.That(heartbeat.clip, Is.SameAs(clip));
+            Assert.That(heartbeat.isPlaying, Is.True);
+            Assert.That(heartbeat.volume, Is.EqualTo(baseVolume));
+            Assert.That(heartbeat.timeSamples, Is.GreaterThanOrEqualTo(middleSample));
+
+            Call(director, "StopEvents");
+            yield return null;
+            Assert.That(heartbeat.clip, Is.SameAs(clip));
+            Assert.That(heartbeat.volume, Is.EqualTo(safeVolume).Within(0.0001f));
+            Assert.That(heartbeat.timeSamples, Is.GreaterThanOrEqualTo(middleSample));
+            yield return Keys();
+            Assert.That(heartbeat.isPlaying, Is.False);
+            Assert.That(heartbeat.volume, Is.EqualTo(baseVolume));
+
+            yield return Keys(Key.RightShift);
+            Assert.That((bool)Call(director, "TryRunEventForDevelopment", computer), Is.True);
+            yield return WaitFor(() => Property<bool>(director, "IsDetectionActive"));
+            yield return Keys();
+            Assert.That(Property<bool>(manager, "IsGameOver"), Is.True);
+            Assert.That(heartbeat.clip, Is.Null);
+            Assert.That(heartbeat.isPlaying, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator LookingWhileTabPaused_PreservesPause_AndMainGameClockKeepsRunning()
         {
-            yield return Keys(Key.Space);
+            yield return Keys(Key.R);
             yield return Keys();
             yield return Keys(Key.Tab);
             var miniGame = Field<MiniGameController>(manager, "currentMiniGameController");

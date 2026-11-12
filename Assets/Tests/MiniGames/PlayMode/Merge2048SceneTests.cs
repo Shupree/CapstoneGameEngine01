@@ -53,7 +53,7 @@ namespace GE.MiniGames.PlayModeTests
         {
             yield return Load(); var game = Object.FindFirstObjectByType<Merge2048Game>();
             Assert.That(game.GetComponent<MiniGameTestUI>(), Is.Not.Null); Capture(game, "Ready", 900, 1000);
-            yield return Keys(Key.Space); yield return new WaitForSeconds(.1f);
+            yield return Keys(Key.R); yield return new WaitForSeconds(.1f);
             Assert.That(game.Model.MoveCount, Is.Zero); Assert.That(game.Model.Tiles.Count(x => x == 2), Is.EqualTo(2));
             SetBoard(game, 0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,2);
             yield return Keys(Key.A); yield return new WaitForSeconds(.15f);
@@ -68,17 +68,17 @@ namespace GE.MiniGames.PlayModeTests
             Capture(game, "Playing", 1280, 960);
         }
         [UnityTest]
-        public IEnumerator Merge128_SendsSingleSuccess_AndSpaceRestarts()
+        public IEnumerator Merge128_SendsSingleSuccess_AndRRestarts()
         {
             yield return Load(); var game = Object.FindFirstObjectByType<Merge2048Game>();
             int results = 0; MiniGameResult last = default; game.Completed += result => { results++; last = result; };
-            yield return Keys(Key.Space); yield return Keys(); SetBoard(game, 64,64);
+            yield return Keys(Key.R); yield return Keys(); SetBoard(game, 64,64);
             yield return Keys(Key.A); yield return Keys(Key.A);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Succeeded)); Assert.That(results, Is.EqualTo(1));
             Assert.That(last.GameId, Is.EqualTo("MiniGame09")); Assert.That(last.Progress, Is.EqualTo(128));
             Assert.That(last.Target, Is.EqualTo(128)); Assert.That(last.Outcome, Is.EqualTo(MiniGameOutcome.Success));
             Assert.That(game.Model.Tiles.Count(x => x != 0), Is.EqualTo(1)); Capture(game, "Success", 900, 1000);
-            yield return Keys(); yield return Keys(Key.Space);
+            yield return Keys(); yield return Keys(Key.R);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing)); Assert.That(game.RunId, Is.EqualTo(2));
             Assert.That(game.Model.Tiles.Count(x => x == 2), Is.EqualTo(2)); Assert.That(game.Model.MoveCount, Is.Zero);
         }
@@ -87,12 +87,12 @@ namespace GE.MiniGames.PlayModeTests
         {
             yield return Load(); var game = Object.FindFirstObjectByType<Merge2048Game>();
             int results = 0; game.Completed += _ => results++;
-            yield return Keys(Key.Space); yield return Keys();
+            yield return Keys(Key.R); yield return Keys();
             SetBoard(game, 2,4,2,4, 4,2,4,2, 2,4,2,4, 4,2,4,2);
             yield return Keys(Key.A); yield return Keys(Key.D);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed)); Assert.That(results, Is.EqualTo(1));
             Assert.That(game.ResultReason, Is.EqualTo("더 이상 움직일 수 없습니다.")); Capture(game, "Failed", 900, 1000);
-            yield return Keys(); yield return Keys(Key.Space);
+            yield return Keys(); yield return Keys(Key.R);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing)); Assert.That(game.Model.MoveCount, Is.Zero);
             Assert.That(game.Model.Tiles.Sum(), Is.EqualTo(4));
         }
@@ -101,7 +101,7 @@ namespace GE.MiniGames.PlayModeTests
         {
             yield return Load(); var game = Object.FindFirstObjectByType<Merge2048Game>();
             int results = 0; MiniGameResult last = default; game.Completed += result => { results++; last = result; };
-            yield return Keys(Key.Space); yield return Keys(Key.Z, Key.X, Key.C);
+            yield return Keys(Key.R); yield return Keys(Key.Z, Key.X, Key.C);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Succeeded)); Assert.That(last.GameId, Is.EqualTo("MiniGame09"));
             Assert.That(last.Outcome, Is.EqualTo(MiniGameOutcome.Success)); Assert.That(results, Is.EqualTo(1));
             game.StartGame(); yield return Keys(Key.Z, Key.X, Key.C); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));

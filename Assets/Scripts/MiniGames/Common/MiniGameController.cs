@@ -48,6 +48,9 @@ namespace GE.MiniGames
             ProcessFrame(Time.deltaTime, keyboardInputEnabled ? ReadButtons() : GameButtons.None);
         }
 
+        // 시작 화면은 공통 R 입력을 사용합니다. 플레이 중 Space는 각 미니게임의 조작 입력입니다.
+        internal static bool IsStartKeyHeld => Keyboard.current?.rKey.isPressed == true;
+
         internal static GameButtons ReadButtons()
         {
             var keyboard = Keyboard.current;

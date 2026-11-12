@@ -46,7 +46,7 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(game.GetComponent<MiniGameTestUI>(), Is.Not.Null);
             double readyTime = game.Model.TimeLeft; yield return new WaitForSeconds(.1f);
             Assert.That(game.Model.TimeLeft, Is.EqualTo(readyTime)); Capture(game, "Ready", 900, 1000);
-            yield return Keys(Key.Space); yield return new WaitForSeconds(.15f);
+            yield return Keys(Key.R); yield return new WaitForSeconds(.15f);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing)); Assert.That(game.Progress, Is.Zero);
             yield return Keys(Key.D); yield return new WaitForSeconds(.1f); Assert.That(game.Model.SelectedIndex, Is.EqualTo(1));
             yield return Keys(Key.W, Key.S); Assert.That(game.Model.SelectedIndex, Is.EqualTo(1));
@@ -64,7 +64,7 @@ namespace GE.MiniGames.PlayModeTests
         {
             yield return Load(); var game = Object.FindFirstObjectByType<BombGame>();
             int results = 0; game.Completed += _ => results++;
-            yield return Keys(Key.Space); yield return Keys();
+            yield return Keys(Key.R); yield return Keys();
             for (int step = 0; step < 4; step++)
             {
                 int target = game.Model.Wires.ToList().IndexOf(game.Model.Sequence[step]);
@@ -82,13 +82,13 @@ namespace GE.MiniGames.PlayModeTests
         public IEnumerator WrongCutAndTimeout_RetryResetsAllLocalState()
         {
             yield return Load(); var game = Object.FindFirstObjectByType<BombGame>();
-            yield return Keys(Key.Space); yield return Keys();
+            yield return Keys(Key.R); yield return Keys();
             int wrong = game.Model.Wires.ToList().FindIndex(c => c != game.Model.Sequence[0]);
             yield return Select(game, wrong); yield return Keys(Key.Space);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed)); Assert.That(game.ResultReason, Is.EqualTo("순서가 틀렸습니다."));
             Capture(game, "Failed", 900, 1000);
             yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
-            yield return Keys(); yield return Keys(Key.Space);
+            yield return Keys(); yield return Keys(Key.R);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing)); Assert.That(game.RunId, Is.EqualTo(2));
             Assert.That(game.Progress, Is.Zero); Assert.That(game.Model.CutWires.All(x => !x), Is.True);
             Assert.That(game.Model.TimeLeft, Is.GreaterThan(4.5)); Assert.That(game.Model.SelectedIndex, Is.Zero);
@@ -101,7 +101,7 @@ namespace GE.MiniGames.PlayModeTests
         {
             yield return Load(); var game = Object.FindFirstObjectByType<BombGame>();
             int results = 0; MiniGameResult last = default; game.Completed += result => { results++; last = result; };
-            yield return Keys(Key.Space); yield return Keys(Key.Z, Key.X, Key.C);
+            yield return Keys(Key.R); yield return Keys(Key.Z, Key.X, Key.C);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Succeeded)); Assert.That(last.GameId, Is.EqualTo("MiniGame07"));
             Assert.That(last.Outcome, Is.EqualTo(MiniGameOutcome.Success)); Assert.That(results, Is.EqualTo(1));
             game.StartGame(); yield return Keys(Key.Z, Key.X, Key.C); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));

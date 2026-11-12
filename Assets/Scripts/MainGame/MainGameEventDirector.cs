@@ -45,6 +45,8 @@ public sealed class MainGameEventDirector : MonoBehaviour
     public DirectorState State => state;
     public MainGameEventBase ActiveEvent => activeEvent;
     public float SecondsUntilNextEvent => secondsUntilNextEvent;
+    // 실제 발각 판정과 심장 소리가 각 이벤트의 같은 위험 구간을 읽습니다.
+    public bool IsDetectionActive => state == DirectorState.Running && activeEvent != null && activeEvent.IsDetectionActive;
 
     private void OnEnable()
     {
@@ -180,8 +182,7 @@ public sealed class MainGameEventDirector : MonoBehaviour
     private void LateUpdate()
     {
         // 매니저의 Update에서 Shift 숨김을 먼저 반영합니다. Tab 정지 여부는 발각을 막지 않습니다.
-        if (state != DirectorState.Running || activeEvent == null || miniGameManager == null) return;
-        if (activeEvent.IsDetectionActive && !miniGameManager.IsMiniGameHidden)
+        if (IsDetectionActive && miniGameManager != null && !miniGameManager.IsMiniGameHidden)
             miniGameManager.TriggerGameOver(EGameOverReason.CaughtByMother);
     }
 

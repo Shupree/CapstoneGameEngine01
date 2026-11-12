@@ -39,19 +39,19 @@ namespace GE.MiniGames.Tests
         }
 
         [Test]
-        public void SpaceHeldBeforeFailure_CannotRetryUntilReleasedAndPressedAgain()
+        public void RKeyHeldBeforeFailure_CannotRetryUntilReleasedAndPressedAgain()
         {
-            presenter.ProcessSpace(false);
-            presenter.ProcessSpace(true);
+            presenter.ProcessStartInput(false);
+            presenter.ProcessStartInput(true);
             int run = game.RunId;
             FailRun();
-            presenter.ProcessSpace(true, true);
-            for (int i = 0; i < 20; i++) presenter.ProcessSpace(true);
+            presenter.ProcessStartInput(true, true);
+            for (int i = 0; i < 20; i++) presenter.ProcessStartInput(true);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
             Assert.That(game.RunId, Is.EqualTo(run));
 
-            presenter.ProcessSpace(false);
-            presenter.ProcessSpace(true);
+            presenter.ProcessStartInput(false);
+            presenter.ProcessStartInput(true);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             Assert.That(game.RunId, Is.EqualTo(run + 1));
             Assert.That(game.Progress, Is.Zero);
@@ -59,22 +59,21 @@ namespace GE.MiniGames.Tests
         }
 
         [Test]
-        public void SpacePressedOnResultTransition_CannotInstantlyRetry()
+        public void StartKeyPressedOnResultTransition_CannotInstantlyRetry()
         {
-            presenter.ProcessSpace(false);
+            presenter.ProcessStartInput(false);
             int run = game.RunId;
             FailRun();
-            // Even if a release has already been observed in this transition frame,
-            // its later key-down must not dismiss a result before it can be seen.
-            presenter.ProcessSpace(false, true);
-            presenter.ProcessSpace(true, true);
+            // 결과가 표시된 프레임에 키를 놓았다 다시 눌러도 결과 화면은 다음 입력까지 유지합니다.
+            presenter.ProcessStartInput(false, true);
+            presenter.ProcessStartInput(true, true);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
-            presenter.ProcessSpace(true);
+            presenter.ProcessStartInput(true);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
             Assert.That(game.RunId, Is.EqualTo(run));
 
-            presenter.ProcessSpace(false);
-            presenter.ProcessSpace(true);
+            presenter.ProcessStartInput(false);
+            presenter.ProcessStartInput(true);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             Assert.That(game.RunId, Is.EqualTo(run + 1));
         }

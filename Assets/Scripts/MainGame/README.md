@@ -18,6 +18,7 @@
 - `MiniGameManager`: Shift 숨김 상태를 제공하고 게임오버·전체 재시작을 담당한다. `GameOverTriggered`와 `GameFinished`를 받으면 Director가 진행 중 이벤트와 다음 타이머를 취소한다.
 - `MainGameDeveloperTools`: Editor와 Development Build의 개발자 도구 표시·버튼 상태만 관리한다. 버튼의 실제 동작은 Director와 MiniGameManager의 공통 API에 위임한다.
 - `MainGameCameraLookController`: MainGame 카메라의 시선만 제어한다. 미니게임이 숨겨지면 좌우 키와 마우스 드래그를 받는다.
+- `MainGameHeartbeat`는 게임기를 숨겼을 때 `Heartbeat_Fast`를 반복하고 Director의 발각 구간에 따라 음량을 조절한다.
 
 ## 문 방문 순서
 
@@ -151,10 +152,10 @@ MainGame의 기존 `EventSystem`은 **씬 최상위**에 둔다. 숨길 수 있�
 | 옷장 등장 즉시 실행 | 현재 연출을 취소한 뒤 옷장 등장과 방문 퇴장을 확정 실행한다. |
 | 컴퓨터 등장 즉시 실행 | 현재 연출을 취소한 뒤 컴퓨터 모니터 등장과 방문 퇴장을 확정 실행한다. |
 | 발소리만 즉시 실행 | 현재 연출을 취소한 뒤 발소리만 들리는 안전한 연출을 확정 실행한다. |
-| 플래피버드 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame02를 새로 로드한다. Space 입력 전에는 Ready 상태다. |
+| 플래피버드 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame02를 새로 로드한다. R 입력 전에는 Ready 상태다. |
 | 스네이크 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame01을 새로 로드한다. 같은 스네이크를 선택해도 새 인스턴스로 교체한다. |
-| 공룡 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame04를 새로 로드한다. Space 입력 전에는 Ready 상태다. |
-| 좌우 분류 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame03을 새로 로드한다. Space 입력 전에는 Ready 상태다. |
+| 공룡 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame04를 새로 로드한다. R 입력 전에는 Ready 상태다. |
+| 좌우 분류 미니게임 시작 | 현재 Additive 미니게임을 정리하고 MiniGame03을 새로 로드한다. R 입력 전에는 Ready 상태다. |
 
 - 미니게임 교체는 목숨·누적 클리어 수·엄마 이벤트를 유지한다. Tab 정지는 이전 컨트롤러와 함께 정리하고 새 게임은 시작 대기로 들어간다.
 - Shift를 누른 상태라면 새 미니게임도 기존 숨김 정책을 따른다.
@@ -187,9 +188,13 @@ MainGame의 기존 `EventSystem`은 **씬 최상위**에 둔다. 숨길 수 있�
 
 Shift를 놓으면 화면이 돌아오고 기존 Tab 상태를 유지한다. 숨긴 동안에는 Tab 전환을 받지 않는다. 전역 `Time.timeScale = 0`은 기존 MainGame 게임오버에서만 사용한다.
 
+미니게임은 R로 시작하거나 재도전한다. 전체 게임오버 화면에서 R과 `Retry?` 클릭은 모두 MainGame을 다시 로드한다. 화면 전환 전에 누른 R은 놓고 다시 눌러야 한다. 플레이 중 점프·발사·분류 등 Space를 쓰는 조작은 각 미니게임의 입력에 따른다.
+
+`MainGameEvents/PlayerHeartbeat`의 Audio Source Volume에서 기준 음량을 조절한다. Shift로 게임기를 숨기면 `Heartbeat_Fast`를 반복하며, 안전 구간에는 기준 음량의 56.25%, 발각 구간에는 기준 음량으로 재생한다. 구간이 바뀌어도 재생 위치를 유지하고 Shift 해제, 게임오버, 목표 달성, 씬 종료 시 멈춘다.
+
 ## 좌우 시선 조작
 
-`Base/Main Camera`에 `MainGameCameraLookController`를 미리 배치하고 같은 씬의 MiniGameManager를 연결한다. **Shift로 미니게임 화면을 숨긴 동안** 좌우 화살표를 누르거나, 방 화면에서 마우스 왼쪽 버튼을 누른 채 가로로 드래그한다. 왼쪽은 책상·모니터 방향, 오른쪽은 창문 방향이다. 드래그는 마우스가 가로로 움직이는 프레임에 화살표와 같은 각속도와 좌우 한계를 적용한다. UI에서 시작한 드래그는 UI 입력으로 처리하고, 두 입력이 겹치면 화살표를 우선한다. 화면을 다시 올리면 마지막 시선을 유지하며, 전체 MainGame을 Retry할 때 최초 시선으로 돌아온다.
+`Base/Main Camera`에 `MainGameCameraLookController`를 미리 배치하고 같은 씬의 MiniGameManager를 연결한다. **Shift로 미니게임 화면을 숨긴 동안** 좌우 화살표를 누르거나, 방 화면에서 마우스 왼쪽 버튼을 누른 채 가로로 드래그한다. 오른쪽으로 드래그하면 시선이 책상 쪽으로, 왼쪽으로 드래그하면 창문 쪽으로 돈다. 드래그에는 방향키 각속도의 1.5배와 같은 좌우 회전 한계를 적용한다. UI에서 시작한 드래그는 UI 입력으로 처리하고, 두 입력이 겹치면 화살표를 우선한다. 화면을 다시 올리면 마지막 시선을 유지하며, 전체 MainGame을 Retry할 때 최초 시선으로 돌아온다.
 
 Inspector에서 다음 항목을 조절한다.
 

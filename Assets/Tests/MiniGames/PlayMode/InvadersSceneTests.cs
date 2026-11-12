@@ -52,8 +52,8 @@ namespace GE.MiniGames.PlayModeTests
             yield return Load(); var game = Object.FindFirstObjectByType<InvadersGame>();
             Assert.That(game.GetComponent<MiniGameTestUI>(), Is.Not.Null);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Ready)); Capture(game, "Ready", 900, 1000);
-            yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
-            Assert.That(game.Model.PlayerShots, Is.Zero, "시작 Space는 발사로 재사용하지 않습니다.");
+            yield return Keys(Key.R); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
+            Assert.That(game.Model.PlayerShots, Is.Zero, "시작 R는 발사로 재사용하지 않습니다.");
             yield return Keys(Key.W, Key.S); float x = game.Model.PlayerX;
             yield return new WaitForSeconds(.05f); Assert.That(game.Model.PlayerX, Is.EqualTo(x));
             yield return Keys(Key.D, Key.Space); yield return new WaitForSeconds(.15f);
@@ -74,16 +74,18 @@ namespace GE.MiniGames.PlayModeTests
         public IEnumerator FailureAndRetry_UseCommonResultAndResetAllLocalState()
         {
             yield return Load(); var game = Object.FindFirstObjectByType<InvadersGame>(); int results = 0;
-            game.Completed += _ => results++; yield return Keys(Key.Space);
+            game.Completed += _ => results++; yield return Keys(Key.R);
+            // R 재도전 뒤 방어막이 이 씬의 첫 실행 상태로 돌아오는지 확인합니다.
+            int initialShieldCount = game.Model.Shields.Count(s => s.Alive);
             typeof(InvadersModel).GetMethod("SpawnBullet", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(game.Model, new object[] { false, new Vector2(game.Model.PlayerX, InvadersRules.PlayerY) });
             yield return null; yield return null;
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed)); Assert.That(game.ResultReason, Is.EqualTo("기체 격추"));
             Assert.That(game.Model.Lives, Is.Zero); Assert.That(results, Is.EqualTo(1)); Capture(game, "Failed", 900, 1000);
             yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
-            yield return Keys(); yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
+            yield return Keys(); yield return Keys(Key.R); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             Assert.That(game.RunId, Is.EqualTo(2)); Assert.That(game.Model.Lives, Is.EqualTo(1));
-            Assert.That(game.Model.Shields.Count(s => s.Alive), Is.EqualTo(24)); Assert.That(game.Progress, Is.Zero);
+            Assert.That(game.Model.Shields.Count(s => s.Alive), Is.EqualTo(initialShieldCount)); Assert.That(game.Progress, Is.Zero);
             Assert.That(game.Model.PlayerShots, Is.Zero); Assert.That(game.Model.EnemyShots, Is.Zero);
         }
 
@@ -92,7 +94,7 @@ namespace GE.MiniGames.PlayModeTests
         {
             yield return Load(); var game = Object.FindFirstObjectByType<InvadersGame>();
             int results = 0; MiniGameResult last = default; game.Completed += result => { results++; last = result; };
-            yield return Keys(Key.Space); yield return Keys(Key.Z, Key.X, Key.C);
+            yield return Keys(Key.R); yield return Keys(Key.Z, Key.X, Key.C);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Succeeded)); Assert.That(last.Outcome, Is.EqualTo(MiniGameOutcome.Success));
             Assert.That(last.GameId, Is.EqualTo("MiniGame06")); Assert.That(results, Is.EqualTo(1)); Capture(game, "Cheat", 900, 1000);
             game.StartGame(); yield return Keys(Key.Z, Key.X, Key.C); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));

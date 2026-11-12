@@ -18,8 +18,8 @@ namespace GE.MiniGames
         // 기존 스네이크의 기본 표기를 유지하면서 거리형 게임도 같은 결과 화면을 사용합니다.
         [SerializeField] private string progressLabel = "사과";
         [SerializeField, TextArea] private string instructions = "WASD  방향 전환\n사과 5개를 먹으면 성공!\n벽과 자신의 몸을 피하세요.";
-        private bool spaceArmed;
-        private bool previousSpace;
+        private bool startKeyArmed;
+        private bool previousStartKey;
         private int changedFrame;
         private bool useExternalPauseOverlay;
 
@@ -30,7 +30,7 @@ namespace GE.MiniGames
             description = body; prompt = hint; instructions = startInstructions;
         }
 
-        public void SetStandaloneControls(bool enabled) { keyboardStartAndRetry = enabled; spaceArmed = false; }
+        public void SetStandaloneControls(bool enabled) { keyboardStartAndRetry = enabled; startKeyArmed = false; }
         public void SetOverlaysVisible(bool visible) { showOverlays = visible; Refresh(); }
 
         // MainGame의 검은 정지 UI와 중복되지 않도록 Paused 화면만 숨깁니다. 시작·실패 화면은 유지합니다.
@@ -39,40 +39,40 @@ namespace GE.MiniGames
         private void OnEnable()
         {
             if (game != null) game.StateChanged += OnStateChanged;
-            spaceArmed = false;
-            previousSpace = (MiniGameController.ReadButtons() & GameButtons.Space) != 0;
+            startKeyArmed = false;
+            previousStartKey = MiniGameController.IsStartKeyHeld;
             Refresh();
         }
         private void Start() { Refresh(); }
         private void OnDisable()
         {
             if (game != null) game.StateChanged -= OnStateChanged;
-            spaceArmed = false;
+            startKeyArmed = false;
         }
         private void OnStateChanged(MiniGameState state)
         {
             changedFrame = Time.frameCount;
-            spaceArmed = false;
+            startKeyArmed = false;
             Refresh();
         }
 
         private void Update()
         {
-            ProcessSpace((MiniGameController.ReadButtons() & GameButtons.Space) != 0,
+            ProcessStartInput(MiniGameController.IsStartKeyHeld,
                 Time.frameCount == changedFrame);
         }
 
-        // 결과 이전부터 누른 Space로 즉시 재시도되지 않도록, 키를 놓은 뒤 새로 누른 입력만 허용합니다.
-        internal void ProcessSpace(bool held, bool isTransitionFrame = false)
+        // 씬 전환이나 결과 표시 전에 누른 R은 놓은 뒤 다시 눌러야 시작 입력으로 처리됩니다.
+        internal void ProcessStartInput(bool held, bool isTransitionFrame = false)
         {
-            bool pressed = held && !previousSpace;
-            previousSpace = held;
+            bool pressed = held && !previousStartKey;
+            previousStartKey = held;
             if (game == null || !keyboardStartAndRetry || !game.KeyboardInputEnabled) return;
             bool waiting = game.State == MiniGameState.Ready || game.State == MiniGameState.Succeeded || game.State == MiniGameState.Failed;
-            if (!waiting) { spaceArmed = false; return; }
-            if (!held) spaceArmed = true;
-            if (isTransitionFrame || !spaceArmed || !pressed) return;
-            spaceArmed = false;
+            if (!waiting) { startKeyArmed = false; return; }
+            if (!held) startKeyArmed = true;
+            if (isTransitionFrame || !startKeyArmed || !pressed) return;
+            startKeyArmed = false;
             // 재시도는 같은 게임을 초기화합니다. 다음 씬 선택은 메인의 성공 결과 처리에서만 수행합니다.
             game.StartGame();
         }
@@ -89,7 +89,7 @@ namespace GE.MiniGames
                 case MiniGameState.Ready:
                     title.text = gameTitle;
                     description.text = string.IsNullOrEmpty(game.StartInstructions) ? instructions : game.StartInstructions;
-                    prompt.text = keyboardStartAndRetry ? "Spacebar로 시작" : "시작 대기 중";
+                    prompt.text = keyboardStartAndRetry ? "R로 시작" : "시작 대기 중";
                     break;
                 case MiniGameState.Paused:
                     title.text = "일시정지";
@@ -100,7 +100,7 @@ namespace GE.MiniGames
                 case MiniGameState.Failed:
                     title.text = state == MiniGameState.Succeeded ? "성공!" : "다시 도전!";
                     description.text = $"{game.ResultReason}\n{progressLabel} {game.Progress} / {game.Target}";
-                    prompt.text = keyboardStartAndRetry ? "Spacebar를 놓고 다시 눌러 재시도" : "진행 대기 중";
+                    prompt.text = keyboardStartAndRetry ? "R로 재시도" : "진행 대기 중";
                     break;
             }
         }

@@ -54,8 +54,10 @@ namespace GE.MiniGames.PlayModeTests
             yield return Load(); var game = Object.FindFirstObjectByType<CrossGame>();
             Assert.That(game, Is.Not.Null); Assert.That(game.GetComponent<MiniGameTestUI>(), Is.Not.Null);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Ready)); Capture(game, "Ready", 900, 1200);
-            yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
-            Assert.That(game.Model.PlayerRow, Is.EqualTo(11), "시작 Space는 전진으로 재사용하지 않습니다.");
+            // 현재 코스 길이에서 시작 위치를 읽어 R 입력이 이동을 발생시키는지 확인합니다.
+            int startRow = CrossModel.Rows - 1;
+            yield return Keys(Key.R); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
+            Assert.That(game.Model.PlayerRow, Is.EqualTo(startRow));
             yield return Keys(Key.A); Assert.That(game.Model.PlayerColumn, Is.EqualTo(4));
             yield return Keys(Key.A); Assert.That(game.Model.PlayerColumn, Is.EqualTo(4));
             Capture(game, "Playing", 900, 1200);
@@ -63,18 +65,18 @@ namespace GE.MiniGames.PlayModeTests
             var xs = game.Model.Cars.Select(c => c.X).ToArray();
             yield return Keys(Key.Tab, Key.W); yield return new WaitForSeconds(.1f);
             Assert.That(game.Model.Cars.Select(c => c.X), Is.EqualTo(xs));
-            Assert.That(game.Model.PlayerRow, Is.EqualTo(11)); Capture(game, "Paused", 1280, 720);
+            Assert.That(game.Model.PlayerRow, Is.EqualTo(startRow)); Capture(game, "Paused", 1280, 720);
             yield return Keys(Key.W); yield return Keys(Key.Tab, Key.W); yield return Keys(Key.W);
-            Assert.That(game.State, Is.EqualTo(MiniGameState.Playing)); Assert.That(game.Model.PlayerRow, Is.EqualTo(11));
+            Assert.That(game.State, Is.EqualTo(MiniGameState.Playing)); Assert.That(game.Model.PlayerRow, Is.EqualTo(startRow));
             yield return Keys();
             // 다음 차선을 막아 실패를 결정적으로 발생시킵니다. 실제 컨트롤러와 충돌 판정은 그대로 사용합니다.
-            SetX(game.Model.Cars.First(c => c.Row == 10), game.Model.PlayerX);
+            SetX(game.Model.Cars.First(c => c.Row == startRow - 1), game.Model.PlayerX);
             yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
             Capture(game, "Failed", 900, 1200);
             yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
-            yield return Keys(); yield return Keys(Key.Space);
+            yield return Keys(); yield return Keys(Key.R);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
-            Assert.That(game.RunId, Is.EqualTo(2)); Assert.That(game.Model.PlayerRow, Is.EqualTo(11));
+            Assert.That(game.RunId, Is.EqualTo(2)); Assert.That(game.Model.PlayerRow, Is.EqualTo(startRow));
         }
 
         [UnityTest]

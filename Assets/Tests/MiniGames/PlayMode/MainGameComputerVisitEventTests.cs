@@ -75,7 +75,8 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(Field<AudioClip>(visit, "computerClip").name, Is.EqualTo("Computer_Noise"));
             Assert.That(sound.spatialBlend, Is.EqualTo(1f));
             Assert.That(Field<float>(visit, "noiseSeconds"), Is.EqualTo(1.5f));
-            Assert.That(Field<float>(visit, "watchSeconds"), Is.EqualTo(1f));
+            // 관찰 시간은 저장된 Inspector 값이 실제 연출에 반영되는지 검사합니다.
+            float watchSeconds = Field<float>(visit, "watchSeconds");
             StartVisit(visit);
             float warnedAt = Time.time;
             Assert.That(Phase, Is.EqualTo("Warning"));
@@ -112,7 +113,7 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(model.position, Is.EqualTo(route[route.Length - 1].position));
             float watchedAt = Time.time;
             yield return WaitFor(() => Phase == "Leaving");
-            Assert.That(Time.time - watchedAt, Is.EqualTo(1f).Within(0.25f));
+            Assert.That(Time.time - watchedAt, Is.EqualTo(watchSeconds).Within(0.25f));
             Assert.That(Property<bool>(closet, "IsClosed"), Is.True);
             yield return WaitFor(() => Phase == "Exiting");
             Assert.That(Property<bool>(exitDoor, "IsOpen"), Is.True);

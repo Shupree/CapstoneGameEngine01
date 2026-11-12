@@ -38,7 +38,7 @@ namespace GE.MiniGames.Dance
             Model.Step(deltaTime); PublishResult();
         }
 
-        // 원본의 자동 초기화 대신 공통 실패 화면으로 알립니다. Space 재시도로 1라운드를 새로 생성합니다.
+        // 공통 실패 화면에서 R을 누르면 1라운드를 새로 생성합니다.
         private void PublishResult()
         {
             if (Model.Result == DanceStep.Success) Finish(MiniGameOutcome.Success, "10라운드를 모두 완료했습니다!");

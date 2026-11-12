@@ -62,10 +62,10 @@ namespace GE.MiniGames.PlayModeTests
             Capture(game, "Ready", 1280, 960);
             int results = 0;
             game.Completed += result => results++;
-            yield return Keys(Key.Space);
-            yield return Keys(Key.Space);
+            yield return Keys(Key.R);
+            yield return Keys(Key.R);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
-            Assert.That(game.Progress, Is.Zero, "시작 Space로 첫 물건까지 처리하면 안 됩니다.");
+            Assert.That(game.Progress, Is.Zero, "시작 R로 첫 물건까지 처리하면 안 됩니다.");
             yield return Keys();
             yield return Keys(KeyFor(game.Model.Current));
             Assert.That(game.Progress, Is.EqualTo(1));
@@ -99,7 +99,7 @@ namespace GE.MiniGames.PlayModeTests
             yield return Keys(Key.Space);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
             Assert.That(results, Is.EqualTo(1));
-            yield return Keys(); yield return Keys(Key.Space);
+            yield return Keys(); yield return Keys(Key.R);
             Assert.That(game.Progress, Is.Zero);
             Assert.That(game.Model.Remaining, Is.EqualTo(30));
             Assert.That(game.RunId, Is.EqualTo(2));
@@ -129,7 +129,7 @@ namespace GE.MiniGames.PlayModeTests
             var second = cards[1].GetComponent<UnityEngine.UI.Image>();
             var current = (UnityEngine.UI.Image)typeof(SortingView).GetField("currentItem",
                 BindingFlags.Instance | BindingFlags.NonPublic).GetValue(view);
-            yield return Keys(Key.Space);
+            yield return Keys(Key.R);
             yield return Keys();
             // 서로 다른 첫 세 물건을 주입해 미리보기와 실제 소비 순서를 명확하게 비교합니다.
             var items = (SortingItem[])typeof(SortingModel).GetField("items",
@@ -179,7 +179,7 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(game.State, Is.EqualTo(MiniGameState.Succeeded));
             Assert.That(cards[0].activeSelf || cards[1].activeSelf, Is.False);
             yield return Keys();
-            yield return Keys(Key.Space);
+            yield return Keys(Key.R);
             Assert.That(cards[0].activeSelf && cards[1].activeSelf, Is.True);
             game.StopGame();
             yield return null; // 표시 계층은 다음 Update에서 정리된 모델을 반영합니다.
@@ -202,13 +202,13 @@ namespace GE.MiniGames.PlayModeTests
             Set(type, "totalMiniGamesToClear", 1);
             type.GetMethod("BindMiniGameResult", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(host, new object[] { game.gameObject.scene });
-            yield return Keys(Key.Space); yield return Keys();
+            yield return Keys(Key.R); yield return Keys();
             int lives = (int)type.GetField("currentLives", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(host);
             yield return Keys(KeyFor(game.Model.Current) == Key.A ? Key.D : Key.A);
             Assert.That((int)type.GetField("currentLives", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(host), Is.EqualTo(lives - 1));
             type.GetMethod("OnMiniGameFailed").Invoke(host, null);
             Assert.That((int)type.GetField("currentLives", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(host), Is.EqualTo(lives - 1));
-            yield return Keys(); yield return Keys(Key.Space);
+            yield return Keys(); yield return Keys(Key.R);
             for (int i = 0; i < 30; i++)
             { yield return Keys(); yield return Keys(KeyFor(game.Model.Current)); }
             for (int i = 0; i < 120 && SceneManager.GetSceneByName("MiniGame03").isLoaded; i++) yield return null;

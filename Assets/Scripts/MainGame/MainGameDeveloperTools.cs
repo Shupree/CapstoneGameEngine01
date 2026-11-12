@@ -97,7 +97,7 @@ public sealed class MainGameDeveloperTools : MonoBehaviour
 
     public void OpenFlappyMiniGame() => OpenMiniGame(flappySceneName);
     public void OpenSnakeMiniGame() => OpenMiniGame(snakeSceneName);
-    // 추가 게임도 동일한 전환 경로를 사용해 목숨·진행도·엄마 이벤트와 Space 시작 대기 규칙을 유지합니다.
+    // 추가 게임도 동일한 전환 경로에서 목숨·진행도·엄마 이벤트를 유지하며 R 시작을 기다립니다.
     public void OpenDinoMiniGame() => OpenMiniGame(dinoSceneName);
     public void OpenSortingMiniGame() => OpenMiniGame(sortingSceneName);
 

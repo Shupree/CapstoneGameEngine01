@@ -307,7 +307,7 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator AuthoredButtons_SwitchGamesToSpaceReady_PreserveProgressAndMotherEvent()
+        public IEnumerator AuthoredButtons_SwitchGamesToReadyForR_PreserveProgressAndMotherEvent()
         {
             var panel = Field<GameObject>(tools, "toolsPanel");
             Assert.That(panel.activeSelf, Is.False);
@@ -332,7 +332,7 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(flappy.GameId, Is.EqualTo("MiniGame02"));
             Assert.That(flappy.State, Is.EqualTo(MiniGameState.Ready));
             Assert.That(flappy.Progress, Is.Zero);
-            yield return Keys(Key.Space);
+            yield return Keys(Key.R);
             Assert.That(flappy.State, Is.EqualTo(MiniGameState.Playing));
             yield return Keys();
             yield return Keys(Key.Tab);
@@ -351,7 +351,7 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(Property<bool>(visit, "IsRunning"), Is.True, "미니게임 교체는 엄마 이벤트를 취소하지 않습니다.");
             Assert.That(Time.timeScale, Is.EqualTo(1f));
             yield return Keys();
-            yield return Keys(Key.Space);
+            yield return Keys(Key.R);
             Assert.That(snake.State, Is.EqualTo(MiniGameState.Playing));
             Click("menuButton");
             Assert.That(panel.activeSelf, Is.False);
@@ -368,7 +368,7 @@ namespace GE.MiniGames.PlayModeTests
             var activeEvent = Property<Object>(director, "ActiveEvent");
             Assert.That(activeEvent, Is.SameAs(visit));
 
-            // 기존 UI 스타일을 복제한 두 버튼의 실제 클릭 연결·Ready 상태·Space 시작을 함께 검증합니다.
+            // 두 버튼의 실제 클릭 연결과 교체된 게임의 Ready 상태 및 R 시작을 함께 검증합니다.
             foreach (var entry in new[] { (button: "dinoButton", scene: "MiniGame04"), (button: "sortingButton", scene: "MiniGame03") })
             {
                 // 앞 게임의 시작 키를 놓은 뒤 버튼을 누릅니다. 씬 로드 중 테스트 장치의 눌림 상태를 넘기지 않습니다.
@@ -386,7 +386,7 @@ namespace GE.MiniGames.PlayModeTests
                 Assert.That(Property<Object>(director, "ActiveEvent"), Is.SameAs(activeEvent));
                 Assert.That(Property<bool>(visit, "IsRunning"), Is.True);
                 yield return Keys();
-                yield return Keys(Key.Space);
+                yield return Keys(Key.R);
                 Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             }
         }

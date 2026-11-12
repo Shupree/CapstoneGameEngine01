@@ -57,7 +57,7 @@ namespace GE.MiniGames.Tests
             Assert.That(game, Is.Not.Null);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Ready));
             Capture(game, "Ready", 1280, 960);
-            InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.Space));
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.R));
             yield return null; yield return null;
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             yield return new WaitForSeconds(0.15f);
@@ -80,7 +80,7 @@ namespace GE.MiniGames.Tests
             yield return new WaitForSeconds(2f);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
             Capture(game, "Failed", 1280, 720);
-            InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.Space)); yield return null; yield return null;
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.R)); yield return null; yield return null;
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             Assert.That(game.Progress, Is.Zero);
             Assert.That(game.RunId, Is.EqualTo(2));

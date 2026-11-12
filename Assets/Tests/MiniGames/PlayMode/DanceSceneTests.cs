@@ -46,7 +46,7 @@ namespace GE.MiniGames.PlayModeTests
             yield return Load(); var game = Object.FindFirstObjectByType<DanceGame>();
             Assert.That(game.GetComponent<MiniGameTestUI>(), Is.Not.Null);
             yield return new WaitForSeconds(.1f); Assert.That(game.Model.TimeLeft, Is.EqualTo(4.8)); Capture(game, "Ready", 900, 1000);
-            yield return Keys(Key.Space); yield return new WaitForSeconds(.1f);
+            yield return Keys(Key.R); yield return new WaitForSeconds(.1f);
             Assert.That(game.Model.InputIndex, Is.Zero); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             yield return Keys(KeyFor(game.Model.Sequence[0])); yield return new WaitForSeconds(.1f);
             Assert.That(game.Model.InputIndex, Is.EqualTo(1), "같은 키를 유지해도 다음 칸을 자동으로 입력하지 않습니다.");
@@ -64,7 +64,7 @@ namespace GE.MiniGames.PlayModeTests
         {
             yield return Load(); var game = Object.FindFirstObjectByType<DanceGame>();
             int results = 0; game.Completed += _ => results++;
-            yield return Keys(Key.Space); yield return Keys();
+            yield return Keys(Key.R); yield return Keys();
             for (int round = 1; round <= 10; round++)
             {
                 Assert.That(game.Model.Round, Is.EqualTo(round));
@@ -87,21 +87,21 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator WrongInputAndTimeout_RequireSpaceRetryFromRoundOne()
+        public IEnumerator WrongInputAndTimeout_RequireRRetryFromRoundOne()
         {
             yield return Load(); var game = Object.FindFirstObjectByType<DanceGame>();
-            yield return Keys(Key.Space); yield return Keys();
+            yield return Keys(Key.R); yield return Keys();
             yield return Keys(KeyFor((DanceDirection)(((int)game.Model.Sequence[0] + 1) % 4)));
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed)); Assert.That(game.ResultReason, Is.EqualTo("방향 순서가 틀렸습니다."));
             Capture(game, "Failed", 900, 1000); yield return new WaitForSeconds(.6f);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed), "원본의 자동 초기화 대신 공통 재시도를 사용합니다.");
-            yield return Keys(); yield return Keys(Key.Space);
+            yield return Keys(); yield return Keys(Key.R);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Playing)); Assert.That(game.RunId, Is.EqualTo(2));
             Assert.That(game.Model.Round, Is.EqualTo(1)); Assert.That(game.Progress, Is.Zero); Assert.That(game.Model.InputIndex, Is.Zero);
             game.Model.Step(5); yield return null;
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed)); Assert.That(game.ResultReason, Is.EqualTo("시간 초과!"));
-            yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
-            yield return Keys(); yield return Keys(Key.Space); Assert.That(game.RunId, Is.EqualTo(3));
+            yield return Keys(Key.R); Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
+            yield return Keys(); yield return Keys(Key.R); Assert.That(game.RunId, Is.EqualTo(3));
         }
 
         [UnityTest]
@@ -109,7 +109,7 @@ namespace GE.MiniGames.PlayModeTests
         {
             yield return Load(); var game = Object.FindFirstObjectByType<DanceGame>();
             int results = 0; MiniGameResult last = default; game.Completed += result => { results++; last = result; };
-            yield return Keys(Key.Space); yield return Keys(Key.Z, Key.X, Key.C);
+            yield return Keys(Key.R); yield return Keys(Key.Z, Key.X, Key.C);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Succeeded)); Assert.That(last.GameId, Is.EqualTo("MiniGame08"));
             Assert.That(last.Outcome, Is.EqualTo(MiniGameOutcome.Success)); Assert.That(results, Is.EqualTo(1));
             game.StartGame(); yield return Keys(Key.Z, Key.X, Key.C); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));

@@ -29,6 +29,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     private bool isRestarting;
     private float timeScaleBeforeGameOver = 1f;
     private EGameOverReason gameOverReason = EGameOverReason.None;
+    private int gameOverFrame;
     private int lastFailedRunId = -1;
 
     private string currentLoadedMiniGame = string.Empty;            // 현재 로드된 미니게임 씬 이름
@@ -104,6 +105,10 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
 
     private void Update()
     {
+        // 게임오버가 시작된 프레임의 입력은 넘기고, 이후에 새로 누른 R을 Retry 버튼과 같은 경로로 처리합니다.
+        if (isGameOver && Time.frameCount != gameOverFrame && Keyboard.current?.rKey.wasPressedThisFrame == true)
+            RestartMainGame();
+
         // 미니게임이 동작 중일 때, Inspector에서 바꾼 Viewport Rect 수치를 실시간 반영 (디버깅용 코드)
         if (IsMiniGameActive && currentMiniGameCamera != null)
         {
@@ -269,7 +274,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         StartCoroutine(RoutineLoadMiniGame(selectedScene));
     }
 
-    // 테스트용 지정 씬 교체입니다. 진행도·목숨·엄마 이벤트는 유지하고 새 컨트롤러의 Ready/Space 시작 흐름을 그대로 사용합니다.
+    // 테스트용 지정 씬 교체입니다. 진행도·목숨·엄마 이벤트는 유지하고 새 컨트롤러가 Ready 상태에서 R 입력을 받습니다.
     public bool TryLoadMiniGameForDevelopment(string sceneName)
     {
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -391,7 +396,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
             OnMiniGameFailed();
     }
 
-    // 실패 결과의 공통 진입점입니다. 실행 번호로 중복 차감을 막고, 목숨이 남으면 기존 Space 재시도를 허용합니다.
+    // 실패 결과의 공통 진입점입니다. 실행 번호로 중복 차감을 막고, 목숨이 남으면 같은 미니게임을 R로 재시도합니다.
     public void OnMiniGameFailed()
     {
         if (isGameOver || isRestarting || isLoading || currentMiniGameController == null) return;
@@ -411,6 +416,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         if (reason == EGameOverReason.None || isGameOver || isRestarting || IsGameFinished) return;
 
         isGameOver = true;
+        gameOverFrame = Time.frameCount;
         gameOverReason = reason;
         // 전역 시간 정지는 MainGame 게임오버에서만 수행합니다. Shift와 Tab은 이 값에 관여하지 않습니다.
         timeScaleBeforeGameOver = Time.timeScale;
@@ -424,7 +430,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         GameOverTriggered?.Invoke(reason);
     }
 
-    // 하이어라키의 Retry? Text에 붙은 Button이 호출합니다. 연속 클릭으로 중복 로드되지 않게 막습니다.
+    // Retry? 버튼과 R 입력이 이 경로를 공유합니다. 먼저 들어온 요청만 재로드를 시작합니다.
     public void RestartMainGame()
     {
         if (!isGameOver || isRestarting) return;

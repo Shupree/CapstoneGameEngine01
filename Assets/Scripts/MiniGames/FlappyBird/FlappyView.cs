@@ -20,7 +20,7 @@ namespace GE.MiniGames.FlappyBird
         [SerializeField] private TMP_Text progress, heading, description, hint;
         [SerializeField] private GameObject overlay;
         [SerializeField] private RectTransform progressFill;
-        private bool previousSpace, spaceArmed;
+        private bool previousStartKey, startKeyArmed;
         private int stateFrame;
         private const float Scale = 60f;
         // 배경·해초의 원본 배율입니다. 플레이어는 이 배율에 BirdSizeScale을 곱해 별도로 축소합니다.
@@ -39,28 +39,28 @@ namespace GE.MiniGames.FlappyBird
         private void OnEnable()
         {
             if (game != null) game.StateChanged += StateChanged;
-            previousSpace = (MiniGameController.ReadButtons() & GameButtons.Space) != 0;
-            spaceArmed = false;
+            previousStartKey = MiniGameController.IsStartKeyHeld;
+            startKeyArmed = false;
             Refresh();
         }
-        private void OnDisable() { if (game != null) game.StateChanged -= StateChanged; spaceArmed = false; }
-        private void StateChanged(MiniGameState state) { stateFrame = Time.frameCount; spaceArmed = false; }
+        private void OnDisable() { if (game != null) game.StateChanged -= StateChanged; startKeyArmed = false; }
+        private void StateChanged(MiniGameState state) { stateFrame = Time.frameCount; startKeyArmed = false; }
         private void Update()
         {
-            ProcessStartInput((MiniGameController.ReadButtons() & GameButtons.Space) != 0, Time.frameCount == stateFrame);
+            ProcessStartInput(MiniGameController.IsStartKeyHeld, Time.frameCount == stateFrame);
             Refresh();
         }
 
-        // 실패를 일으킨 Space가 재시도로 이어지지 않도록 결과 이후 키 해제를 요구합니다.
+        // 시작·결과 화면에 진입하기 전부터 R을 누르고 있었다면 키를 놓은 뒤 새로 누를 때 시작합니다.
         internal void ProcessStartInput(bool held, bool transitionFrame = false)
         {
-            bool pressed = held && !previousSpace;
-            previousSpace = held;
+            bool pressed = held && !previousStartKey;
+            previousStartKey = held;
             if (game == null || !game.KeyboardInputEnabled) return;
             bool waiting = game.State == MiniGameState.Ready || game.State == MiniGameState.Failed || game.State == MiniGameState.Succeeded;
-            if (!waiting) { spaceArmed = false; return; }
-            if (!held) spaceArmed = true;
-            if (!transitionFrame && spaceArmed && pressed) { spaceArmed = false; game.StartGame(); }
+            if (!waiting) { startKeyArmed = false; return; }
+            if (!held) startKeyArmed = true;
+            if (!transitionFrame && startKeyArmed && pressed) { startKeyArmed = false; game.StartGame(); }
         }
 
         public void Refresh()
@@ -91,14 +91,14 @@ namespace GE.MiniGames.FlappyBird
             overlay.SetActive(state != MiniGameState.Playing && state != MiniGameState.Stopped &&
                 !(state == MiniGameState.Paused && game.ExternalPauseControl));
             if (state == MiniGameState.Ready)
-            { heading.text = "플래피버드"; description.text = game.StartInstructions; hint.text = "SPACE  시작"; }
+            { heading.text = "플래피버드"; description.text = game.StartInstructions; hint.text = "R  시작"; }
             else if (state == MiniGameState.Paused)
             { heading.text = "일시정지"; description.text = "위치와 통과 횟수는 유지됩니다."; hint.text = "TAB  계속하기"; }
             else if (state == MiniGameState.Failed || state == MiniGameState.Succeeded)
             {
                 heading.text = state == MiniGameState.Succeeded ? "성공!" : "다시 도전!";
                 description.text = $"{game.ResultReason}\n파이프 {game.Progress} / {game.Target}";
-                hint.text = "SPACE를 놓고 다시 눌러 재시도";
+                hint.text = "R로 재시도";
             }
         }
 

@@ -194,8 +194,8 @@ namespace GE.MiniGames.PlayModeTests
             yield return Load(); var game = Object.FindFirstObjectByType<DinoGame>();
             Capture(game, "Ready");
             yield return Keys(Key.Tab); Assert.That(game.State, Is.EqualTo(MiniGameState.Ready));
-            yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
-            Assert.That(game.Model.Height, Is.Zero, "시작 Space는 점프하지 않습니다.");
+            yield return Keys(Key.R); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
+            Assert.That(game.Model.Height, Is.Zero, "시작 R는 점프하지 않습니다.");
             yield return Keys(); yield return Keys(Key.Space); Assert.That(game.Model.Height, Is.GreaterThan(0));
             yield return new WaitForSeconds(.15f); Capture(game, "Jump");
             yield return Keys(Key.Tab); Assert.That(game.State, Is.EqualTo(MiniGameState.Paused));
@@ -209,7 +209,7 @@ namespace GE.MiniGames.PlayModeTests
             for (int i=0; i<50 && game.State == MiniGameState.Playing; i++) Frame(game,.1f,16);
             Assert.That(game.State, Is.EqualTo(MiniGameState.Failed)); Capture(game, "Failed");
             yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
-            yield return Keys(); yield return Keys(Key.Space); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
+            yield return Keys(); yield return Keys(Key.R); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing));
             Assert.That(game.Model.Distance, Is.Zero); Assert.That(game.Model.Height, Is.Zero); Assert.That(game.Model.Velocity, Is.Zero);
         }
 

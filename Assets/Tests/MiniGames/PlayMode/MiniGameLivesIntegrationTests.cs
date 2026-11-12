@@ -103,7 +103,7 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator Failure_CostsOneLife_DuplicateAndStaleResultsAreIgnored_SpaceRetries()
+        public IEnumerator Failure_CostsOneLife_DuplicateAndStaleResultsAreIgnored_RKeyRetries()
         {
             snake.StartGame();
             FailRun();
@@ -117,11 +117,13 @@ namespace GE.MiniGames.PlayModeTests
             Call("OnMiniGameFailed");
             Assert.That(Field<int>("currentLives"), Is.EqualTo(2), "동일 실행의 실패는 한 번만 차감합니다.");
 
-            // 기존 Space 재시도가 다음 실행 번호를 만들며, 전체 게임의 남은 목숨은 초기화하지 않습니다.
+            // R 재시도가 다음 실행 번호를 만들며, 전체 게임의 남은 목숨은 초기화하지 않습니다.
             int failedRun = snake.RunId;
             snake.KeyboardInputEnabled = true;
             yield return Keys();
             yield return Keys(Key.Space);
+            Assert.That(snake.State, Is.EqualTo(MiniGameState.Failed));
+            yield return Keys(Key.R);
             Assert.That(snake.State, Is.EqualTo(MiniGameState.Playing));
             Assert.That(snake.RunId, Is.EqualTo(failedRun + 1));
             handler(oldFailure);
@@ -183,8 +185,10 @@ namespace GE.MiniGames.PlayModeTests
         }
 
         [UnityTest]
-        public IEnumerator MotherCaughtDuringLoading_UsesSameGameOver_AndRetryWaitsForLoading()
+        public IEnumerator MotherCaughtDuringLoading_RequiresNewRPressToRetry()
         {
+            // 게임오버 전에 눌러 둔 R과 기존 Space는 Retry를 시작할 수 없습니다.
+            yield return Keys(Key.R);
             Call("LoadRandomMiniGame");
             Assert.That(Field<bool>("isLoading"), Is.True);
             TriggerMotherGameOver();
@@ -192,10 +196,19 @@ namespace GE.MiniGames.PlayModeTests
             Assert.That(Field<object>("gameOverReason").ToString(), Is.EqualTo("CaughtByMother"));
             TriggerMotherGameOver();
             var oldManager = manager;
-            Call("RestartMainGame");
-            Call("RestartMainGame");
+            yield return Keys(Key.R);
+            Assert.That(Field<bool>("isRestarting"), Is.False);
+            yield return Keys(Key.Space);
+            Assert.That(Field<bool>("isRestarting"), Is.False);
+            yield return Keys(Key.R);
             yield return WaitForNewHost(oldManager);
             AssertFreshHost();
+            // 전체 재시작에 쓴 R을 계속 누르고 있어도 새 미니게임은 시작 대기를 유지합니다.
+            var freshGame = Field<MiniGameController>("currentMiniGameController");
+            Assert.That(freshGame.State, Is.EqualTo(MiniGameState.Ready));
+            yield return Keys();
+            yield return Keys(Key.R);
+            Assert.That(freshGame.State, Is.EqualTo(MiniGameState.Playing));
         }
 
         [UnityTest]

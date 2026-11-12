@@ -16,7 +16,7 @@ namespace GE.MiniGames.Sorting
         [SerializeField] private TMP_Text progress, remaining, itemName, heading, description, hint;
         [SerializeField] private RectTransform progressFill;
         [SerializeField] private GameObject overlay;
-        private bool previousSpace, spaceArmed;
+        private bool previousStartKey, startKeyArmed;
         private int stateFrame;
         // 기존 모델의 Box/Bottle/Stone/Leaf/Bolt 순서는 유지하고 씬의 새 장난감 이미지와 표시 이름만 대응합니다.
         private static readonly string[] ItemNames = { "곰 인형", "로봇", "오리", "닭", "파란 새" };
@@ -34,32 +34,32 @@ namespace GE.MiniGames.Sorting
         private void OnEnable()
         {
             if (game != null) game.StateChanged += OnStateChanged;
-            previousSpace = (MiniGameController.ReadButtons() & GameButtons.Space) != 0;
-            spaceArmed = false;
+            previousStartKey = MiniGameController.IsStartKeyHeld;
+            startKeyArmed = false;
             Refresh();
         }
         private void OnDisable()
         {
             if (game != null) game.StateChanged -= OnStateChanged;
-            spaceArmed = false;
+            startKeyArmed = false;
         }
-        private void OnStateChanged(MiniGameState state) { stateFrame = Time.frameCount; spaceArmed = false; }
+        private void OnStateChanged(MiniGameState state) { stateFrame = Time.frameCount; startKeyArmed = false; }
         private void Update()
         {
-            ProcessStartInput((MiniGameController.ReadButtons() & GameButtons.Space) != 0, Time.frameCount == stateFrame);
+            ProcessStartInput(MiniGameController.IsStartKeyHeld, Time.frameCount == stateFrame);
             Refresh();
         }
 
-        // 결과를 발생시킨 Space를 놓아야 재시도할 수 있습니다. 시작 Space는 첫 물건 분류에 재사용하지 않습니다.
+        // 시작·결과 화면에서 새로 누른 R을 받습니다. 분류 입력은 게임이 시작된 뒤에 처리합니다.
         internal void ProcessStartInput(bool held, bool transitionFrame = false)
         {
-            bool pressed = held && !previousSpace;
-            previousSpace = held;
+            bool pressed = held && !previousStartKey;
+            previousStartKey = held;
             if (game == null || !game.KeyboardInputEnabled) return;
             bool waiting = game.State == MiniGameState.Ready || game.State == MiniGameState.Failed || game.State == MiniGameState.Succeeded;
-            if (!waiting) { spaceArmed = false; return; }
-            if (!held) spaceArmed = true;
-            if (!transitionFrame && spaceArmed && pressed) { spaceArmed = false; game.StartGame(); }
+            if (!waiting) { startKeyArmed = false; return; }
+            if (!held) startKeyArmed = true;
+            if (!transitionFrame && startKeyArmed && pressed) { startKeyArmed = false; game.StartGame(); }
         }
 
         public void Refresh()
@@ -80,14 +80,14 @@ namespace GE.MiniGames.Sorting
             overlay.SetActive(state != MiniGameState.Playing && state != MiniGameState.Stopped &&
                 !(state == MiniGameState.Paused && game.ExternalPauseControl));
             if (state == MiniGameState.Ready)
-            { heading.text = "좌우 분류"; description.text = game.StartInstructions; hint.text = "SPACE  시작"; }
+            { heading.text = "좌우 분류"; description.text = game.StartInstructions; hint.text = "R  시작"; }
             else if (state == MiniGameState.Paused)
             { heading.text = "일시정지"; description.text = "정답 수와 현재 오브젝트는 유지됩니다."; hint.text = "Tab으로 재개"; }
             else if (state == MiniGameState.Failed || state == MiniGameState.Succeeded)
             {
                 heading.text = state == MiniGameState.Succeeded ? "성공!" : "다시 도전!";
                 description.text = $"{game.ResultReason}\n정답 {game.Progress} / {game.Target}";
-                hint.text = "SPACE를 놓고 다시 눌러 재시도";
+                hint.text = "R로 재시도";
             }
         }
 

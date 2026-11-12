@@ -42,7 +42,7 @@ Lobby
 → 성공: 클리어 수 증가 후 다음 미니게임
 → 실패: 목숨 1개 차감, 목숨이 남으면 같은 미니게임 재시도
 → 목숨 소진 또는 다른 패배 조건: 게임오버
-→ Retry? 클릭: MainGame 전체 재생성
+→ R 또는 Retry? 클릭 → MainGame 전체 재생성
 ```
 
 - 기획상 미니게임 목표는 **18개**다. 현재 등록된 씬은 `MiniGame01`(스네이크), `MiniGame02`(Flappy), `MiniGame03`(Sorting), `MiniGame04`(Dino)이며 각각 공통 컨트롤러가 연결되어 있다.
@@ -120,7 +120,7 @@ Lobby
 | Shift로 숨긴 동안 | Tab으로 정지 상태를 바꾸지 않는다. MainGame에 배치한 정지 오버레이도 함께 숨긴다. |
 | 숨긴 동안 좌우 화살표 | MainGame 카메라만 수평 회전한다. 왼쪽 키는 책상·모니터, 오른쪽 키는 창문까지 제한하며 키 해제·화면 복원 후에도 마지막 각도를 유지한다. |
 | MainGame 게임오버 | 현재 전체 진행을 `Time.timeScale = 0`으로 정지한다. 클릭 UI는 계속 작동해야 한다. |
-| MiniGame01 단독 실행 | 메인 매니저를 만들지 않고 기존 Space 시작·재시도와 자체 Tab 정지·재개를 유지한다. |
+| MiniGame01 단독 실행 | 메인 매니저를 만들지 않고 R 시작·재시도와 자체 Tab 정지·재개를 유지한다. |
 
 - MainGame에 연결되면 `ExternalPauseControl = true`로 컨트롤러 자체 Tab 처리를 막는다. 한 입력을 매니저와 컨트롤러가 동시에 처리하지 않게 한다.
 - `MiniGameTestUI.SetExternalPauseOverlay(true)`는 기존 **정지 화면만** 숨긴다. 이를 시작·실패 화면 전체를 끄는 처리로 바꾸지 않는다.
@@ -135,7 +135,7 @@ Lobby
 
 - 기본 목숨은 `startingLives = 3`, 현재 목숨은 매니저의 `currentLives` 정수로 관리한다. 외부 조회는 `CurrentLives`를 사용한다.
 - 유효한 실패 한 번에 `OnMiniGameFailed()`에서 1개만 차감한다. 미니게임이 별도로 목숨을 차감하지 않는다.
-- 목숨이 남으면 같은 씬에서 기존 Space 재시도를 허용한다. 다음 미니게임으로 자동 넘어가거나 전체 MainGame을 리셋하지 않는다.
+- 목숨이 남으면 같은 씬에서 R 재시도를 허용한다. 다음 미니게임으로 자동 넘어가거나 전체 MainGame을 리셋하지 않는다.
 - 목숨이 0개면 `TriggerGameOver(EGameOverReason.LivesDepleted)`로 진입한다.
 - 엄마 발각 등 다른 패배 원인도 같은 `TriggerGameOver`를 사용한다. 별도의 게임오버 플래그·화면·재시작 경로를 중복 구현하지 않는다.
 
@@ -149,7 +149,7 @@ MiniGameManager.Singleton.TriggerGameOver(EGameOverReason.CaughtByMother);
 - 새 원인은 `EGameOverReason`에 추가한다. 현재 값은 `None`, `LivesDepleted`, `CaughtByMother`다.
 - 이미 게임오버가 됐거나 재시작 중이면 결과·입력·추가 종료 요청을 중복 처리하지 않는다. 먼저 확정된 패배 원인을 덮어쓰지 않는다.
 - `LivesChanged`, `GameOverTriggered`를 연동할 수 있다. 구독한 쪽은 자신의 수명에 맞춰 구독을 해제한다.
-- `Retry?`는 `RestartMainGame()`을 호출한다. Additive 씬 정리 → MainGame 전체 재로드 → 새 매니저의 `Awake()`에서 목숨 3개와 클리어 수 0으로 초기화하는 흐름을 유지한다.
+- 전체 게임오버 화면의 R과 `Retry?` 클릭은 `RestartMainGame()`을 호출한다. Additive 씬 정리 → MainGame 전체 재로드 → 새 매니저의 `Awake()`에서 목숨 3개와 클리어 수 0으로 초기화하는 흐름을 유지한다.
 - 미니게임 로딩 중 발각된 경우와 Retry 연속 클릭도 고려한다. 기존 로드 대기·중복 재시작 차단을 제거하지 않는다.
 - 재시작 시 기존 싱글턴이 남아 새 매니저를 중복 인스턴스로 제거하는 문제가 생기지 않게 한다. `RoutineRestartMainGame()`의 씬 이동·정리 순서를 임의로 생략하지 않는다.
 - 재시작·종료 뒤 0배 시간이 남지 않아야 한다. 미니게임만 초기화하고 MainGame 전체 재시작이 됐다고 보고하지 않는다.
@@ -185,13 +185,14 @@ MainGame
 - MainGame의 기존 EventSystem은 씬 최상위에 둔다. 비활성화할 수 있는 `UIsRoot`·개발자 패널·정지/게임오버 오버레이 아래로 다시 넣지 않는다. Canvas를 숨기면 다른 Canvas의 버튼까지 입력을 잃는 문제가 재발한다.
 - 미니게임 카메라는 매니저가 지정하는 viewport를 따른다. 현재 기본값은 `(0.15, 0.15, 0.7, 0.7)`, depth는 `1`이다. 전체 화면으로 덮어쓰지 않는다.
 - 새 미니게임 카메라가 `Camera.main` 선택을 방해하지 않도록 태그를 확인한다. 카메라·Canvas·조명·오디오 등 Additive 씬 간 간섭을 함께 확인한다.
-- `Base/Main Camera`의 시선은 `MainGameCameraLookController`가 담당한다. 위치·상하 각도·기울기·FOV·미니게임 카메라는 유지하며 Y축만 회전한다. Inspector의 `Left Yaw Offset`(음수, 책상)과 `Right Yaw Offset`(양수, 창문)으로 한계를 조절한다. `Rotation Speed Degrees Per Second`는 좌우 공통 각속도이며 기존 책상 속도인 약 66.89도/초를 기준으로 한다. 양끝까지 같은 시간을 쓰는 정규화 이동으로 되돌리면 좌우 속도가 달라지므로 실제 각도를 초당 일정하게 이동한다. 자동 상향 회전·FOV 보정을 다시 추가하지 않는다. 화면 재표시·미니게임 교체는 마지막 시선을 유지하고 전체 Retry에서만 최초 구도로 돌아온다.
+- `Base/Main Camera`의 시선은 `MainGameCameraLookController`가 담당한다. 위치·상하 각도·기울기·FOV·미니게임 카메라는 유지하며 Y축만 회전한다. Inspector의 `Left Yaw Offset`(음수, 책상)과 `Right Yaw Offset`(양수, 창문)으로 한계를 조절한다. `Rotation Speed Degrees Per Second`는 좌우 공통 각속도이며 기존 책상 속도인 약 66.89도/초를 기준으로 한다. 양끝까지 같은 시간을 쓰는 정규화 이동으로 되돌리면 좌우 속도가 달라지므로 실제 각도를 초당 일정하게 이동한다. 마우스 드래그는 화면을 끌어당기는 방향으로 회전하며 화살표 각속도의 1.5배를 적용한다. 화면 재표시·미니게임 교체는 마지막 시선을 유지하고 전체 Retry에서만 최초 구도로 돌아온다.
 - Shift로 미니게임을 숨겼을 때 방 화면에서 시작한 마우스 왼쪽 드래그도 방향키와 같은 각속도 및 좌우 한계를 쓴다. 가로 델타는 방향 판정에 쓰고, UI에서 시작한 입력은 카메라 드래그에서 제외한다.
 - 씬 구성 도구를 실행하기 전에 기존 씬의 저장 상태를 확인한다. 기존 씬을 파괴하고 다시 만들어 UI 문제를 해결하지 않는다.
 
 ## 9. Unity 환경과 연결 문제
 
-- 개발자 도구는 MainGame의 `DeveloperToolsCanvas`에 미리 배치한다. 일반 빌드에서는 숨긴다. 강제 미니게임 교체는 목숨·클리어 수·엄마 이벤트를 보존하고 Space 시작 대기로 연다. 이벤트 즉시 실행은 기존 이벤트를 취소한 뒤 무작위 실행한다.
+- 개발자 도구는 MainGame의 `DeveloperToolsCanvas`에 미리 배치한다. 일반 빌드에서는 숨긴다. 강제 미니게임 교체는 목숨·클리어 수·엄마 이벤트를 보존하고 R 시작 대기로 연다. 이벤트 즉시 실행은 기존 이벤트를 취소한 뒤 무작위 실행한다.
+- `MainGameEvents/PlayerHeartbeat`는 Shift로 게임기를 숨긴 동안 `Heartbeat_Fast`를 반복한다. Audio Source의 Volume을 기준으로 안전 구간에는 56.25%, Director가 보고하는 발각 구간에는 100%로 재생한다.
 - 이벤트 간격과 침대 관찰 시간의 Inspector 설정 위치·개발자 도구 동작은 [MainGame 가이드](Assets/Scripts/MainGame/README.md)를 따른다.
 - 개발자 도구에는 무작위 실행 외에 여섯 이벤트의 지정 실행 버튼이 있다. `eventShortcuts` 목록으로 버튼·이벤트를 연결하고 OnClick에 `RunEventImmediately(MainGameEventBase)`와 대상을 저장한다. Director의 `TryRunEventForDevelopment`는 가중치를 무시하되 등록·활성·참조·게임 종료 상태를 검사하고, 유효한 요청만 기존 이벤트를 취소한 뒤 실행한다. 같은 종류도 재실행하며 확률·진행도는 유지한다. 새 이벤트 버튼에 타입별 분기나 전용 메서드를 추가하지 않는다.
 - 현재 이벤트 가중치는 일반 문 방문 38, 돌진 방문 7, 창문 등장 10, 옷장 등장 10, 컴퓨터 등장 10, 발소리만 25다. Director의 `eventEntries` 목록에서 함께 관리한다. 0/비활성/실행 불가능 항목을 제외한 비율로 선택하며, 기존 `events` 참조 목록은 자동 이전용 숨김 필드로 보존한다. 새 이벤트를 하드코딩 분기로 선택하지 않는다.
@@ -231,7 +232,7 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 | PlayMode `MainGameComputerVisitEventTests` | 3D 경고음·회색 화면 슬롯, 등장 크기·기어 나오는 관절과 책상 앞 착지, 침대 관찰·방문 닫힘·발각과 전환 정리 |
 | PlayMode `MainGameWindowEventTests` | 원본 노크·무음 개폐·Inspector 시간, 수평 상체의 방 안 진입, 등장부터 닫힘까지 발각·Retry, 경고/닫힘 후 안전, 전 단계 취소·배우 공유·어두운 외형 |
 | PlayMode `MainGameDeveloperToolsTests` | 버튼 연결·Raycaster, 실제 마우스로 메뉴·여섯 이벤트 지정 실행·기존 테스트 UI·Retry·재시작 후 클릭, 0 가중치/같은 이벤트 재실행·잘못된 대상 거부·문/창문/공용 배우 취소 정리, 미니게임 Ready 전환·진행도 보존, 종료 시 차단, Inspector 시간 적용 |
-| PlayMode `MainGameCameraLookTests` | 실제 숨김, 화살표·마우스 드래그 방향, 부드러운 수평 회전과 제한, 좌우·정면 통과 각속도 일치, 각도 보존·FOV 고정, Tab 정지·메인 시간·미니게임 교체·전체 재시작 |
+| PlayMode `MainGameCameraLookTests` | 실제 숨김, 화살표·마우스 드래그 방향과 속도, Shift·발각에 따른 심장 소리, 수평 회전과 제한, 좌우·정면 통과 각속도 일치, 각도 보존·FOV 고정, Tab 정지·메인 시간·미니게임 교체·전체 재시작 |
 
 관련 기능을 수정한 경우 다음을 확인한다.
 
@@ -239,8 +240,8 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 2. Tab을 길게 눌러도 한 번만 정지하며, MainGame 시간은 계속 흐른다.
 3. Tab 정지 후 Shift로 숨겼다 돌아와도 정지 상태와 진행도가 유지된다.
 4. 실패 한 번에 목숨이 정확히 하나 줄고, 중복·지난 결과는 반영되지 않는다.
-5. 목숨이 남으면 Space로 같은 게임을 재시도하며 목숨·전체 진행도는 유지된다.
-6. 세 번째 실패 시 전체 화면 게임오버가 표시되고 `Retry?` 클릭이 작동한다.
+5. 목숨이 남으면 R로 같은 게임을 재시도하며 목숨·전체 진행도는 유지된다.
+6. 세 번째 실패 시 전체 화면 게임오버가 표시되고 R 또는 `Retry?` 클릭으로 재시작한다.
 7. Retry 후 기존 MainGame 오브젝트와 Additive 씬이 제거되고, 새 실행은 목숨 3개·클리어 수 0으로 시작한다.
 8. 엄마 발각에 해당하는 공통 진입점과 로딩 중 게임오버도 같은 종료·재시작 경로를 따른다.
 9. 미니게임 단독 실행과 다른 게임으로의 전환도 유지된다.

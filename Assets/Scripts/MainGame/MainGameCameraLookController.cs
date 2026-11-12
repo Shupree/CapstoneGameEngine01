@@ -17,12 +17,13 @@ public sealed class MainGameCameraLookController : MonoBehaviour
     [SerializeField, Range(0f, 180f)] private float rightYawOffset = 30.52f;
     [Tooltip("좌우 공통 회전 속도(도/초)입니다. 기존 책상 방향 속도인 약 66.89도/초를 기준으로 설정합니다. 회전 범위와 별개로 속도를 유지합니다.")]
     [SerializeField, Min(0.01f)] private float rotationSpeedDegreesPerSecond = 66.89351f;
+    private const float MouseRotationSpeedMultiplier = 1.5f;
 
     private Vector3 initialLocalEuler;
     private float currentYawOffset;
     private Mouse dragMouse;
 
-    // -1=왼쪽(책상), 0=최초 시선, 1=오른쪽(창문)입니다. 키와 드래그의 방향을 실제 수평 회전 방향과 일치시킵니다.
+    // -1=왼쪽(책상), 0=최초 시선, 1=오른쪽(창문)입니다. 드래그는 방 화면을 끌어당기는 방향으로 처리합니다.
     // 조회용 정규화 값만 좌우 범위에 맞춥니다. 실제 이동은 각도 단위로 계산해 정면 통과 시에도 속도가 변하지 않습니다.
     public float CurrentLookAmount => currentYawOffset < 0f ?
         -Mathf.InverseLerp(0f, leftYawOffset, currentYawOffset) : Mathf.InverseLerp(0f, rightYawOffset, currentYawOffset);
@@ -49,12 +50,14 @@ public sealed class MainGameCameraLookController : MonoBehaviour
         bool left = keyboard != null && keyboard.leftArrowKey.isPressed;
         bool right = keyboard != null && keyboard.rightArrowKey.isPressed;
         // 방향키에 우선권을 주어 동시에 입력해도 회전 속도가 더해지지 않게 합니다.
-        int direction = left || right ? (right ? 1 : 0) - (left ? 1 : 0) : dragDirection;
+        bool usingArrowKeys = left || right;
+        int direction = usingArrowKeys ? (right ? 1 : 0) - (left ? 1 : 0) : dragDirection;
         if (direction == 0) return;
-        // 좌우 한계까지 같은 시간을 쓰면 범위가 넓은 쪽이 빨라집니다. 공통 각속도로 실제 각도를 이동해 이를 방지합니다.
+        // 입력 종류별 각속도로 실제 각도를 이동하므로 좌우 범위가 달라도 한 입력의 속도는 일정합니다.
+        float speed = Mathf.Max(0.01f, rotationSpeedDegreesPerSecond);
+        if (!usingArrowKeys) speed *= MouseRotationSpeedMultiplier;
         float targetYawOffset = direction < 0 ? leftYawOffset : rightYawOffset;
-        currentYawOffset = Mathf.MoveTowards(currentYawOffset, targetYawOffset,
-            Mathf.Max(0.01f, rotationSpeedDegreesPerSecond) * Time.deltaTime);
+        currentYawOffset = Mathf.MoveTowards(currentYawOffset, targetYawOffset, speed * Time.deltaTime);
         ApplyLookRotation();
     }
 
@@ -76,9 +79,9 @@ public sealed class MainGameCameraLookController : MonoBehaviour
         }
 
         if (dragMouse != mouse) return 0;
-        // 픽셀 이동량은 방향 판정에만 씁니다. 키보드와 같은 각속도로 움직이고 수직 드래그는 무시합니다.
+        // 화면을 오른쪽으로 끌면 시선이 왼쪽으로 돕니다. 가로 픽셀 이동량은 방향 판정에만 사용합니다.
         float horizontalDelta = mouse.delta.ReadValue().x;
-        return horizontalDelta > 0f ? 1 : horizontalDelta < 0f ? -1 : 0;
+        return horizontalDelta > 0f ? -1 : horizontalDelta < 0f ? 1 : 0;
     }
 
     private void OnDisable() => dragMouse = null;

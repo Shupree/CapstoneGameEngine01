@@ -46,7 +46,7 @@ namespace GE.MiniGames.Sorting
             if (result == SortingStep.Success)
                 Finish(MiniGameOutcome.Success, $"{Target}개를 모두 정확하게 분류했습니다!");
             else if (result == SortingStep.Wrong)
-                // 기존 메인의 OnMiniGameFailed가 실행당 한 번 목숨을 차감하고 로컬 Space 재시도를 허용합니다.
+                // 메인이 실행당 한 번 목숨을 차감하고, 목숨이 남으면 결과 화면에서 R 재시도를 받습니다.
                 Finish(MiniGameOutcome.Failure, "잘못 분류했습니다. 처음부터 다시 도전하세요.");
             else NotifyChanged();
         }
