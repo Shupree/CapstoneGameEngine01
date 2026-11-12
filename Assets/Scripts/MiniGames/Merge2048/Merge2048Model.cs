@@ -56,11 +56,12 @@ namespace GE.MiniGames.Merge2048
                     changed |= cells[index] != merged[offset]; cells[index] = merged[offset];
                 }
             }
-            if (changed) MoveCount++;
             // 128을 만든 순간 종료하며 성공 이동 뒤에는 새 타일을 추가하지 않습니다.
-            if (HighestTile >= Goal) { Result = MergeStep.Success; return changed; }
-            if (changed) SpawnTile();
-            // 가득 차도 인접한 같은 숫자가 있으면 계속할 수 있습니다. 무효 입력으로는 생성/횟수 증가가 없습니다.
+            if (HighestTile >= Goal) { if (changed) MoveCount++; Result = MergeStep.Success; return changed; }
+            // 같은 방향을 다시 눌러 이동·병합이 없어도 빈칸에 2를 생성합니다. 생성만 된 입력도 이동 횟수에 포함합니다.
+            changed |= SpawnTile();
+            if (changed) MoveCount++;
+            // 가득 차도 인접한 같은 숫자가 있으면 계속할 수 있습니다. 이동과 생성이 모두 불가능하면 횟수는 유지합니다.
             if (!HasAvailableMove()) Result = MergeStep.NoMoves;
             return changed;
         }
@@ -77,13 +78,14 @@ namespace GE.MiniGames.Merge2048
         }
 
         // 모든 빈칸 중 하나를 균등 추첨합니다. 4 타일은 생성하지 않으며 기존 타일을 덮어쓰지 않습니다.
-        private void SpawnTile()
+        private bool SpawnTile()
         {
             int empty = 0; foreach (int value in cells) if (value == 0) empty++;
-            if (empty == 0) return;
+            if (empty == 0) return false;
             int chosen = random.Next(empty);
             for (int i = 0; i < cells.Length; i++)
-                if (cells[i] == 0 && chosen-- == 0) { cells[i] = 2; return; }
+                if (cells[i] == 0 && chosen-- == 0) { cells[i] = 2; return true; }
+            return false;
         }
 
         private bool HasAvailableMove()
