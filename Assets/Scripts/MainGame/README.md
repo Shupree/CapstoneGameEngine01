@@ -192,6 +192,21 @@ Shift를 놓으면 화면이 돌아오고 기존 Tab 상태를 유지한다. 숨
 
 `MainGameEvents/PlayerHeartbeat`의 Audio Source Volume에서 기준 음량을 조절한다. Shift로 게임기를 숨기면 `Heartbeat_Fast`를 반복하며, 안전 구간에는 기준 음량의 56.25%, 발각 구간에는 기준 음량으로 재생한다. 구간이 바뀌어도 재생 위치를 유지하고 Shift 해제, 게임오버, 목표 달성, 씬 종료 시 멈춘다.
 
+## 1인칭 게임기와 손
+
+`Base/Main Camera/HandheldConsoleRig`는 게임기(`HandheldConsole` 프리팹)와 그것을 쥔 손이다. `HandheldConsoleView`가 게임기 화면(`Screen` 렌더러)을 매니저의 미니게임 viewport(기본 70%)에 맞춰 매 프레임 위치·크기를 정하므로, 미니게임 화면이 게임기 화면 안에 그려진 것처럼 보인다. 70% viewport에서는 게임기 폭이 화면보다 넓어 그립과 손은 화면 좌우 바깥에 걸친다. 16:9가 아닌 해상도에서는 화면 쪽이 viewport를 덮도록 맞추고 남는 부분은 꺼진 화면색으로 보인다.
+
+- Shift로 숨기면 게임기를 가슴 쪽 이불 속으로 눕히며 내리고(`Lower Seconds`, 기본 0.3초), 다 내려가면 게임기·손 렌더러를 끄고 침대 위 몸의 쉬는 팔(`Map/PlayerInBed/Arms`)을 켠다. Shift를 놓으면 쉬는 팔을 바로 감추고 게임기를 다시 든다(`Raise Seconds`, 기본 0.12초). 목표 달성 뒤에도 게임기를 내린다.
+- 이 동작은 화면 연출일 뿐이다. 숨김·발각 판정(`IsMiniGameHidden`)과 미니게임 화면 숨김은 매니저가 Shift 입력 즉시 처리한다.
+- 게임기가 제자리에 있지 않은 동안(주로 다시 드는 0.12초) 미니게임 카메라가 켜져 있으면, 그 카메라의 `targetTexture`를 잠시 RenderTexture로 바꿔 게임기 화면(`M_Console_ScreenLive`, Unlit)에 그린다. 그래서 미니게임 화면이 게임기 모델을 따라 기울고 움직인다. 제자리에 오면 `targetTexture`를 비워 원래처럼 매니저 viewport에 직접 그린다. 매니저가 정한 카메라 rect·depth·enabled는 바꾸지 않는다.
+- 옮겨 그리는 동안에는 방 카메라의 색 보정이 미니게임 화면에도 한 번 더 걸려 조금 연하고 붉게 보이며 한 프레임 늦다. 짧은 순간이라 눈에 띄지 않게 `Raise Seconds`를 짧게 둔다. 이 기능을 끄려면 `Live Screen Material`을 비운다.
+- 내리는 모양은 `Lower Drop`(화면 높이 배수, 0.85), `Lower Forward`(앞으로 밀리는 거리, 0.15), `Lower Tilt Degrees`(윗부분이 앞으로 눕는 각도, 55°)로 조절한다. `Lower Drop`이 너무 크면 중간에 일찍 화면 밖으로 빠져 눕는 동작이 보이지 않는다. 연출은 실제 시간으로 진행해 게임오버의 timeScale 0에도 멈추지 않는다.
+- 매니저 상태(`IsMiniGameHidden`, `IsGameFinished`, `MiniGameViewportRect`)는 조회만 하며 viewport·숨김 정책은 바꾸지 않는다.
+- Inspector의 `Screen Distance`는 카메라에서 게임기 화면까지의 거리다. Near Clip(0.3)보다 커야 버튼·엄지가 잘리지 않는다. 거리를 바꿔도 화면 정렬은 유지되고 게임기의 실제 크기만 달라진다.
+- 편집 모드에서는 매 프레임 갱신되지 않으므로 컴포넌트 우클릭 → `Fit To Viewport Now`로 배치를 다시 맞춘다. 쉬는 팔 전환은 플레이 중에만 한다.
+- 손 모양·쉬는 팔은 `Tools > Art > Build Player In Bed`(`Assets/_Art/Editor/PlayerInBedBuilder.cs`)로 다시 생성한다. 씬 배치·참조 연결은 `Tools > Art > Place Handheld Console Rig (Active Scene)`이다.
+- PlayMode `MainGameHandheldConsoleTests`가 화면 정렬과 숨김 전환을 검증한다.
+
 ## 좌우 시선 조작
 
 `Base/Main Camera`에 `MainGameCameraLookController`를 미리 배치하고 같은 씬의 MiniGameManager를 연결한다. **Shift로 미니게임 화면을 숨긴 동안** 좌우 화살표를 누르거나, 방 화면에서 마우스 왼쪽 버튼을 누른 채 가로로 드래그한다. 오른쪽으로 드래그하면 시선이 책상 쪽으로, 왼쪽으로 드래그하면 창문 쪽으로 돈다. 드래그에는 방향키 각속도의 1.5배와 같은 좌우 회전 한계를 적용한다. UI에서 시작한 드래그는 UI 입력으로 처리하고, 두 입력이 겹치면 화살표를 우선한다. 화면을 다시 올리면 마지막 시선을 유지하며, 전체 MainGame을 Retry할 때 최초 시선으로 돌아온다.

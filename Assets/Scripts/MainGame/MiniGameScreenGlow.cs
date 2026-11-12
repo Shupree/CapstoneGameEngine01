@@ -6,6 +6,7 @@ using UnityEngine.Rendering;
 // - MainGame의 Point Light 하나에 붙여 사용합니다. 화면 색을 주기적으로 읽어 조명 색·밝기로 옮깁니다.
 // - 미니게임 씬·MiniGameManager의 동작은 바꾸지 않고 조회만 합니다(Inspector 참조, 싱글턴 생성 없음).
 // - Shift로 숨기면 화면이 이불 속으로 들어간 것으로 보고 빛을 줄입니다(hiddenIntensityMultiplier).
+//   snapOffWhenHidden이 켜져 있으면 숨기는 순간 바로 줄이고, 다시 꺼낼 때만 서서히 켭니다.
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Light))]
 public sealed class MiniGameScreenGlow : MonoBehaviour
@@ -19,6 +20,8 @@ public sealed class MiniGameScreenGlow : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float minBrightness = 0.35f;
     [Tooltip("Shift로 게임기를 숨긴 동안 남길 빛의 비율입니다. 0이면 완전히 꺼집니다(이불 속에 숨긴 상태).")]
     [SerializeField, Range(0f, 1f)] private float hiddenIntensityMultiplier = 0f;
+    [Tooltip("켜면 Shift로 숨기는 순간 빛이 서서히 줄지 않고 바로 숨김 밝기로 떨어집니다(화면을 끈 것처럼). 다시 꺼낼 때는 Fade Speed로 켜집니다.")]
+    [SerializeField] private bool snapOffWhenHidden = true;
 
     [Header("Color")]
     [Tooltip("켜면 실제 게임 화면의 평균 색을 따라갑니다. 끄면 Fallback Color만 사용합니다.")]
@@ -78,7 +81,9 @@ public sealed class MiniGameScreenGlow : MonoBehaviour
         Color targetColor = ComputeTargetColor(out float brightness);
         float targetIntensity = maxIntensity * Mathf.Lerp(minBrightness, 1f, brightness) * VisibilityFactor();
         currentColor = Color.Lerp(currentColor, targetColor, step);
-        currentIntensity = Mathf.Lerp(currentIntensity, targetIntensity, step);
+        // 숨긴 동안에는 서서히 줄이지 않고 숨김 밝기로 바로 맞춘다. 매니저의 숨김 상태(Update)를 읽으므로 Shift를 누른 그 프레임에 꺼진다.
+        bool snapOff = snapOffWhenHidden && miniGameManager != null && miniGameManager.IsMiniGameHidden && targetIntensity < currentIntensity;
+        currentIntensity = snapOff ? targetIntensity : Mathf.Lerp(currentIntensity, targetIntensity, step);
         ApplyToLight();
     }
 

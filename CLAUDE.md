@@ -1,6 +1,6 @@
 # Claude 협업 작업 지침
 
-이 문서는 협업자의 Claude가 프로젝트를 수정할 때 지켜야 할 규칙과 기존 시스템의 연결 계약을 정리한다. **2026-10-29에 확인한 코드 기준**이다. 구현이 바뀌면 관련 설명도 함께 갱신한다.
+이 문서는 협업자의 Claude가 프로젝트를 수정할 때 지켜야 할 규칙과 기존 시스템의 연결 계약을 정리한다. **2026-11-12에 확인한 코드 기준**(커밋 `8d4b2b0`)이다. 구현이 바뀌면 관련 설명도 함께 갱신한다.
 
 사용자의 최신 요청과 [AGENTS.md](AGENTS.md)를 먼저 확인한다. 작업 전 현재 코드와 씬의 실제 연결을 읽고, 이전 대화나 과거 문서만으로 구현 상태를 추정하지 않는다.
 
@@ -45,10 +45,24 @@ Lobby
 → R 또는 Retry? 클릭 → MainGame 전체 재생성
 ```
 
-- 기획상 미니게임 목표는 **18개**다. 현재 등록된 씬은 `MiniGame01`(스네이크), `MiniGame02`(Flappy), `MiniGame03`(Sorting), `MiniGame04`(Dino)이며 각각 공통 컨트롤러가 연결되어 있다.
-- 씬 목록은 계속 늘어날 수 있다. 과거의 두 씬 구성이나 MiniGame02가 빈 테스트 씬이라는 가정을 새 구현·테스트에 사용하지 않는다.
+- 기획상 미니게임 목표는 **18개**다. 현재 9개가 MainGame 매니저의 `miniGameSceneNames`와 Build Settings에 모두 등록되어 있고, 각각 공통 `MiniGameController`가 연결되어 있다.
+
+| 씬 | 게임 | 스크립트 폴더 |
+| --- | --- | --- |
+| `MiniGame01` | 스네이크 | `Snake` |
+| `MiniGame02` | 플래피 버드 | `FlappyBird` |
+| `MiniGame03` | 좌우 분류 | `Sorting` |
+| `MiniGame04` | 크롬 공룡 게임 | `Dino` |
+| `MiniGame05` | 길 건너기 | `Cross` |
+| `MiniGame06` | 우주 방어전(인베이더) | `Invaders` |
+| `MiniGame07` | 폭탄 해체 | `Bomb` |
+| `MiniGame08` | 구애의 춤 | `Dance` |
+| `MiniGame09` | 2048(128 만들기) | `Merge2048` |
+
+- 씬 목록은 계속 늘어날 수 있다. 과거의 두 씬·네 씬 구성이나 MiniGame02가 빈 테스트 씬이라는 가정을 새 구현·테스트에 사용하지 않는다.
+- 모든 미니게임은 공통 R 시작·재시도를 쓰며, 플레이 중 Space는 각 게임의 조작 입력이다. Z+X+C 동시 입력은 Editor·개발 빌드 전용 클리어 치트(`DEV_CLEAR_CHEAT`)다.
 - 현재 목표 판정은 **누적 18회 클리어**다. 선택 풀이 소진되면 다시 채우므로, 서로 다른 18개를 한 번씩 완료했는지 검사하는 구현은 아니다.
-- `OnGameEnding()`은 승리 로그와 `GameFinished` 알림을 보낸다. 엔딩 화면은 아직 없으며, 엄마의 문 방문·발각 이벤트는 구현되어 있다.
+- `OnGameEnding()`은 승리 로그와 `GameFinished` 알림을 보낸다. 엔딩 화면은 아직 없다. 엄마 이벤트(문 방문, 돌진 방문, 창문, 옷장, 컴퓨터, 발소리만)와 발각 게임오버는 구현되어 있다.
 - `PageBase.FakeLoad()`는 임시 로딩 표시다. 게임 성공·실패나 게임오버를 판단하는 함수가 아니다.
 
 ## 4. 코드의 책임과 어셈블리 경계
@@ -64,6 +78,10 @@ Lobby
 | `Assets/Scripts/MainGame/MotherDoorVisitEvent.cs` | 발걸음 → 문 열기 → 침대 관찰 → 퇴장 → 문 닫기의 순서와 발각 시간. |
 | `Assets/Scripts/MainGame/MotherDoorRushEvent.cs` | 같은 문 방문 경고 → 완전 개방 뒤 뜸 → 빠른 왕복·짧은 관찰. 별도 가중치 항목이며 공용 배우·문·경로를 사용한다. |
 | `Assets/Scripts/MainGame/MotherWindowPeekEvent.cs` | 노크 두 번 → 무음 개방 → 수평 상체·얼굴을 방 안으로 들이밀기 → 퇴장 → 무음 닫힘. 표시 시작부터 완전 닫힘까지 발각 구간이다. |
+| `Assets/Scripts/MainGame/MotherClosetVisitEvent.cs`, `ClosetDoors.cs` | 옷장 소리 세 번 → 두 문짝 개방·등장 → 침대 앞 돌진·관찰 → 방문으로 퇴장. `ClosetDoors`는 문짝 한 쌍의 개폐만 담당한다. |
+| `Assets/Scripts/MainGame/MotherComputerVisitEvent.cs`, `ComputerCrawlPose.cs` | 모니터 잡음·회색 화면 경고 → 작은 크기에서 커지며 모니터에서 기어 나옴 → 침대 관찰 → 방문 퇴장. `ComputerCrawlPose`는 이 이벤트 동안만 공용 Humanoid 관절을 덮어쓰고 종료 시 복원한다. |
+| `Assets/Scripts/MainGame/HandheldConsoleView.cs` | `Base/Main Camera/HandheldConsoleRig`(게임기 + 쥔 손)에 붙어, 게임기 화면이 매니저의 `MiniGameViewportRect`를 덮도록 매 프레임 위치·크기를 맞춘다. `IsMiniGameHidden`·`IsGameFinished`를 조회만 하며, 숨김이면 게임기를 이불 쪽으로 눕히며 내린 뒤(기본 0.3초) 게임기·손 렌더러를 끄고 `PlayerInBed/Arms`(배 위 쉬는 팔)를 켜며, 해제 시 0.12초 만에 다시 든다. 이 연출은 화면용이며 숨김·발각 판정 시점은 매니저의 Shift 처리 그대로다. 게임기가 움직이는 동안에만 미니게임 카메라의 `targetTexture`를 RenderTexture로 빌려 게임기 화면에 그리고, 제자리에 오면 null로 되돌린다(rect·depth·enabled는 건드리지 않음). 미니게임 카메라의 출력 대상을 다루는 다른 코드를 추가할 때는 이 동작과 겹치지 않는지 확인한다. viewport·카메라·숨김 정책은 바꾸지 않는다. 리그는 그림자를 드리우지 않는다. 프리팹은 `Tools > Art > Build Player In Bed`, 씬 배치는 `Tools > Art > Place Handheld Console Rig`로 만든다. |
+| `Assets/Scripts/MainGame/MainGameHeartbeat.cs` | Shift 숨김 동안 심장 소리를 반복하고 Director의 발각 구간에 따라 음량만 바꾼다. 발각 판정을 하지 않는다. |
 | `Assets/Scripts/MainGame/WindowController.cs` | 기존 아래 창짝의 수직 슬라이드와 열림 상태. 소리와 독립된 Inspector 개폐 시간을 이벤트에서 전달한다. |
 | `Assets/Scripts/MainGame/MotherAppearance.cs`, `MotherAppearanceProfile.cs` | 모든 엄마 프리팹의 공통 어두운 외형. 공유 프로필과 PropertyBlock을 사용해 원본 머티리얼·텍스처·알파를 보존한다. |
 | `Assets/Scripts/MainGame/MotherFootstepsOnlyEvent.cs` | 접근 발소리 → 1초 대기 → 돌아가는 발소리. 문·엄마를 제어하지 않고 발각 판정은 항상 false다. |
@@ -73,7 +91,7 @@ Lobby
 | `Assets/Scripts/MainGame/MiniGameScreenGlow.cs` | `Base/MiniGameScreenLight`(Point Light)에 붙어 미니게임 viewport의 평균 색을 화면 복사·비동기 읽기로 샘플링해 조명 색·세기로 옮긴다. 매니저는 Inspector 참조로 조회만 하며(`IsMiniGameHidden`, `MiniGameViewportRect`), 숨김·게임오버·미니게임 없음이면 꺼진다. 방 주변광·달빛 값은 [셰이더 가이드 9장](Assets/Rendering/RetroScreen/SHADER_GUIDE.md)을 따른다. |
 | `Assets/Scripts/MainGame/MainGameCameraLookController.cs` | MainGame 카메라의 좌우 시선. Shift 숨김에서 화살표와 마우스 왼쪽 드래그를 받고 마지막 각도를 유지한다. Inspector의 끝 각도와 좌우 공통 각속도를 사용한다. |
 | `Assets/Scripts/MiniGames/Common` | `IMiniGame`, `MiniGameController`, 결과·상태 계약, 단독 실행용 UI. 변경 시 모든 미니게임에 미칠 영향을 확인한다. |
-| `Assets/Scripts/MiniGames/Snake` | 스네이크 규칙·로컬 실행·화면 표시. 전체 목숨이나 다음 씬을 직접 관리하지 않는다. |
+| `Assets/Scripts/MiniGames/<게임>` | 게임별 Model(규칙)·Game(공통 계약 연결)·View(화면 표시). 전체 목숨이나 다음 씬을 직접 관리하지 않는다. 게임별 규칙은 `Assets/MiniGames/<게임>/README.md`가 있는 경우 그 문서를 따른다. |
 | `Assets/Scripts/MiniGames/Editor` | Editor 전용 씬 구성·검증 도구. 런타임 코드와 분리한다. |
 
 **어셈블리 의존성 방향을 유지한다.**
@@ -118,7 +136,8 @@ Lobby
 | Shift 누름 | 미니게임의 Camera·Canvas만 숨긴다. 루트·로직·물리·전역 시간은 계속 진행된다. |
 | Shift 해제 | 게임기를 다시 표시한다. 숨기기 전에 Tab으로 정지했다면 정지 상태를 유지한다. |
 | Shift로 숨긴 동안 | Tab으로 정지 상태를 바꾸지 않는다. MainGame에 배치한 정지 오버레이도 함께 숨긴다. |
-| 숨긴 동안 좌우 화살표 | MainGame 카메라만 수평 회전한다. 왼쪽 키는 책상·모니터, 오른쪽 키는 창문까지 제한하며 키 해제·화면 복원 후에도 마지막 각도를 유지한다. |
+| 숨긴 동안 좌우 화살표·마우스 드래그 | MainGame 카메라만 수평 회전한다. 왼쪽은 책상·모니터, 오른쪽은 창문까지 제한하며 입력 해제·화면 복원 후에도 마지막 각도를 유지한다. 두 입력이 겹치면 화살표를 우선한다. |
+| 숨긴 동안 심장 소리 | `MainGameHeartbeat`가 반복 재생한다. 안전 구간은 기준 음량의 56.25%, 발각 구간은 100%이며 Shift 해제·게임오버·목표 달성 시 멈춘다. |
 | MainGame 게임오버 | 현재 전체 진행을 `Time.timeScale = 0`으로 정지한다. 클릭 UI는 계속 작동해야 한다. |
 | MiniGame01 단독 실행 | 메인 매니저를 만들지 않고 R 시작·재시도와 자체 Tab 정지·재개를 유지한다. |
 
@@ -161,6 +180,7 @@ MiniGameManager.Singleton.TriggerGameOver(EGameOverReason.CaughtByMother);
 - 현재 정지·게임오버 UI는 런타임 스크립트로 생성하지 않고 **MainGame 하이어라키에 미리 배치**한다.
 - 같은 기능의 Canvas·Image·Text를 새로 만들기 전에 기존 오브젝트와 Inspector 참조를 확인한다.
 - uGUI와 TextMeshPro를 사용한다. `Retry?`에는 Text 자체의 Button을 사용하므로 버튼 배경용 Image를 추가할 필요가 없다.
+- 메인 UI 한글 폰트 `Assets/TextMesh Pro/Resources/SpoqaHanSansNeo-BoldBlack SDF.asset`은 **Static** 아틀라스다(KS X 1001 완성형 2,350자 + ASCII·호환 자모·자주 쓰는 기호 + 씬·프리팹·스크립트 문자열의 글자, 4096×2048, 포인트 크기 42). Dynamic으로 되돌리지 않는다. Dynamic이면 실행할 때마다 글리프가 추가되고 빌드·테스트 때 지워져 커밋에 의미 없는 변경이 섞인다. 새 UI 문구에 목록 밖 글자가 있어 네모로 보이면 `Tools > Art > Bake Main UI Font (Static)`(`Assets/_Art/Editor/MainUIFontBaker.cs`)을 다시 실행한다. 기본 글자 목록은 `Assets/_Art/Editor/MainUIFontCharset.txt`에서 고친다. 이 도구는 에셋을 제자리에서 다시 채워 GUID와 머티리얼 참조를 유지한다. 미니게임은 게임별 Static 폰트(`<게임>UI SDF`)를 쓴다.
 - Inspector 참조, Button의 저장된 `OnClick`, `.meta` GUID를 보존한다. 필드 이름 변경 시 직렬화 데이터의 이전도 함께 고려한다.
 
 현재 하이어라키는 다음과 같다.
@@ -187,11 +207,12 @@ MainGame
 - 새 미니게임 카메라가 `Camera.main` 선택을 방해하지 않도록 태그를 확인한다. 카메라·Canvas·조명·오디오 등 Additive 씬 간 간섭을 함께 확인한다.
 - `Base/Main Camera`의 시선은 `MainGameCameraLookController`가 담당한다. 위치·상하 각도·기울기·FOV·미니게임 카메라는 유지하며 Y축만 회전한다. Inspector의 `Left Yaw Offset`(음수, 책상)과 `Right Yaw Offset`(양수, 창문)으로 한계를 조절한다. `Rotation Speed Degrees Per Second`는 좌우 공통 각속도이며 기존 책상 속도인 약 66.89도/초를 기준으로 한다. 양끝까지 같은 시간을 쓰는 정규화 이동으로 되돌리면 좌우 속도가 달라지므로 실제 각도를 초당 일정하게 이동한다. 마우스 드래그는 화면을 끌어당기는 방향으로 회전하며 화살표 각속도의 1.5배를 적용한다. 화면 재표시·미니게임 교체는 마지막 시선을 유지하고 전체 Retry에서만 최초 구도로 돌아온다.
 - Shift로 미니게임을 숨겼을 때 방 화면에서 시작한 마우스 왼쪽 드래그도 방향키와 같은 각속도 및 좌우 한계를 쓴다. 가로 델타는 방향 판정에 쓰고, UI에서 시작한 입력은 카메라 드래그에서 제외한다.
+- 창밖 풍경은 `Map/NightView`의 Unlit 배경판(그림자 끔)이다. 카메라나 창의 위치를 옮기면 `Tools > Art > Build Night Window Views (Active Scene)`를 다시 실행한다. 조절 방법은 [셰이더 가이드 9장](Assets/Rendering/RetroScreen/SHADER_GUIDE.md)을 따른다.
 - 씬 구성 도구를 실행하기 전에 기존 씬의 저장 상태를 확인한다. 기존 씬을 파괴하고 다시 만들어 UI 문제를 해결하지 않는다.
 
 ## 9. Unity 환경과 연결 문제
 
-- 개발자 도구는 MainGame의 `DeveloperToolsCanvas`에 미리 배치한다. 일반 빌드에서는 숨긴다. 강제 미니게임 교체는 목숨·클리어 수·엄마 이벤트를 보존하고 R 시작 대기로 연다. 이벤트 즉시 실행은 기존 이벤트를 취소한 뒤 무작위 실행한다.
+- 개발자 도구는 MainGame의 `DeveloperToolsCanvas`에 미리 배치한다. 일반 빌드에서는 숨긴다. 강제 미니게임 교체 버튼은 현재 MiniGame01~04 네 개만 있으며, 목숨·클리어 수·엄마 이벤트를 보존하고 R 시작 대기로 연다. 이벤트 즉시 실행은 기존 이벤트를 취소한 뒤 무작위 실행한다.
 - `MainGameEvents/PlayerHeartbeat`는 Shift로 게임기를 숨긴 동안 `Heartbeat_Fast`를 반복한다. Audio Source의 Volume을 기준으로 안전 구간에는 56.25%, Director가 보고하는 발각 구간에는 100%로 재생한다.
 - 이벤트 간격과 침대 관찰 시간의 Inspector 설정 위치·개발자 도구 동작은 [MainGame 가이드](Assets/Scripts/MainGame/README.md)를 따른다.
 - 개발자 도구에는 무작위 실행 외에 여섯 이벤트의 지정 실행 버튼이 있다. `eventShortcuts` 목록으로 버튼·이벤트를 연결하고 OnClick에 `RunEventImmediately(MainGameEventBase)`와 대상을 저장한다. Director의 `TryRunEventForDevelopment`는 가중치를 무시하되 등록·활성·참조·게임 종료 상태를 검사하고, 유효한 요청만 기존 이벤트를 취소한 뒤 실행한다. 같은 종류도 재실행하며 확률·진행도는 유지한다. 새 이벤트 버튼에 타입별 분기나 전용 메서드를 추가하지 않는다.
@@ -200,7 +221,7 @@ MainGame
 - 컴퓨터 등장은 `Computer_Noise`와 모니터 화면 슬롯의 회색 재질로 경고한 뒤 공용 Humanoid의 크기와 관절을 잠시 바꿔 기어 나온다. `ComputerVisitWaypoints`에서 등장·책상 끝·바닥에 서는 자세를 편집한다. 발각은 배우가 보일 때부터 방문이 닫힐 때까지 유지한다. 취소 시 임시 화면 재질과 배우 상태를 복원한다.
 - `MotherDoorRush`의 뜸·관찰 시간은 기본 각 1초이며 Inspector에서 독립적으로 조절한다. 완전 개방 뒤 뜸을 세지만 발각은 기존처럼 문 열기 시작 +1초부터 완전 닫힘까지다. `MotherActorController.FollowPath`의 속도 인자는 이번 이동에만 적용하며 공유 배우의 기본 이동 속도·Run 속도를 덮어쓰지 않는다. 취소·관찰 시 애니메이션 속도를 복원한다.
 - 창문 이벤트는 침대 옆 `Map/wallWindowSlide/windowBottom`만 움직인다. `MotherWindowPeek`의 두 노크 뒤 대기·관찰·무음 개폐 시간은 각각 Inspector에서 조절한다. `Open_Window`는 어떤 단계에서도 재생하지 않는다. 기존 배우를 `BlendPose`로 수평 자세에 놓아 얼굴과 상체가 방 안으로 나오게 하며, 위치·회전은 `WindowPeekWaypoints`에서 조절한다. 다음 문 이벤트는 자신의 ShowAt 지점으로 서 있는 자세를 복원한다. 엄마가 사라진 후에도 창문이 완전히 닫힐 때까지 발각 구간을 유지하고, 종료·취소 시 소리·배우·창문을 함께 복원한다.
-- 모든 엄마 외형은 `Assets/_Art/Settings/MotherDarkAppearance.asset`을 공유한다. 두 엄마 프리팹의 `MotherAppearance`를 유지하고 피부·머리·옷의 원본 공유 머티리얼을 직접 어둡게 덮어쓰지 않는다. 이 설정은 문 방문과 창문 등장에 함께 적용한다.
+- 모든 엄마 외형은 `Assets/_Art/Settings/MotherDarkAppearance.asset`을 공유한다. 두 엄마 프리팹의 `MotherAppearance`를 유지하고 피부·머리·옷의 원본 공유 머티리얼을 직접 어둡게 덮어쓰지 않는다. 이 설정은 공용 배우를 쓰는 모든 등장(문 방문·돌진·창문·옷장·컴퓨터)에 함께 적용된다.
 
 - Editor 버전은 `ProjectSettings/ProjectVersion.txt`를 따른다. 현재 `6000.3.23f1`이다.
 - URP, New Input System, uGUI/TMP를 유지한다. 버전과 의존성은 `Packages/manifest.json` 및 `packages-lock.json`을 확인한다.
@@ -222,7 +243,9 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 | EditMode `SnakeModelTests` | 스네이크 규칙·충돌·사과·성공 판정 |
 | EditMode `SnakeLifecycleTests`, `SnakeTestUITests` | 상태 전환·결과 1회 통지·입력·로컬 재시도 |
 | PlayMode `SnakeScenePlayModeTests` | 저장된 미니게임 씬의 입력·화면·viewport·언로드 |
+| EditMode `<게임>Tests`, PlayMode `<게임>SceneTests` | MiniGame02~09 각 게임의 규칙(Flappy·Sorting·DinoCourse·Cross·Invaders·Bomb·Dance·Merge2048)과 저장된 씬 실행 |
 | PlayMode `MiniGameClearIntegrationTests` | MainGame의 클리어 집계·다음 씬·중복/과거 결과 차단 |
+| PlayMode `MiniGameRandomFlowTests` | 매니저 씬 목록과 Build Settings의 `MiniGame##` 씬 일치(하드코딩 없음), MainGame 18회·Lobby 진입 후 풀 한 바퀴 클리어 동안 묶음마다 등록된 모든 게임이 한 번씩 선택되는지, 재충전 직후 연속 선택 금지. 01~03은 실제 규칙으로 플레이하고, 04 이후(새 게임 포함)는 가상 키보드의 Z+X+C(`DEV_CLEAR_CHEAT`)로 같은 성공 경로를 탄다. 각 게임의 규칙 기반 성공은 `<게임>SceneTests`가 담당한다. |
 | PlayMode `MiniGamePauseIntegrationTests` | Tab 정지·재개, Shift 숨김과의 조합, 정지 UI 수명 |
 | PlayMode `MiniGameLivesIntegrationTests` | 목숨 차감·로컬 재시도·게임오버·전체 재시작·다른 패배 원인 |
 | PlayMode `MainGameMotherEventIntegrationTests` | 실제 소리 종료·문 시작 기준 시간, 침대 관찰·퇴장, 닫힘 중 발각, Tab 상태의 발각, 재시작·목표 달성 시 이벤트 수명 |
@@ -232,6 +255,7 @@ Unity Test Runner의 주요 테스트는 다음과 같다.
 | PlayMode `MainGameComputerVisitEventTests` | 3D 경고음·회색 화면 슬롯, 등장 크기·기어 나오는 관절과 책상 앞 착지, 침대 관찰·방문 닫힘·발각과 전환 정리 |
 | PlayMode `MainGameWindowEventTests` | 원본 노크·무음 개폐·Inspector 시간, 수평 상체의 방 안 진입, 등장부터 닫힘까지 발각·Retry, 경고/닫힘 후 안전, 전 단계 취소·배우 공유·어두운 외형 |
 | PlayMode `MainGameDeveloperToolsTests` | 버튼 연결·Raycaster, 실제 마우스로 메뉴·여섯 이벤트 지정 실행·기존 테스트 UI·Retry·재시작 후 클릭, 0 가중치/같은 이벤트 재실행·잘못된 대상 거부·문/창문/공용 배우 취소 정리, 미니게임 Ready 전환·진행도 보존, 종료 시 차단, Inspector 시간 적용 |
+| PlayMode `MainGameHandheldConsoleTests` | 저장된 MainGame의 게임기 화면이 미니게임 viewport를 덮는지(Near Clip 포함), Shift 직후 게임기가 사라지지 않고 아래로 내려가는 중간 상태, Shift 프레임에 게임기 화면 빛 즉시 꺼짐과 해제 후 다시 켜짐, 올리는 동안 미니게임 화면을 게임기 화면 텍스처로 옮겨 그렸다가 제자리에서 viewport로 복귀(rect 불변), 다 내린 뒤 쉬는 팔로 교체, 해제 즉시 게임기 표시와 다 올린 뒤 정렬, 숨김 중 시선 회전 후 복원 정렬 |
 | PlayMode `MainGameCameraLookTests` | 실제 숨김, 화살표·마우스 드래그 방향과 속도, Shift·발각에 따른 심장 소리, 수평 회전과 제한, 좌우·정면 통과 각속도 일치, 각도 보존·FOV 고정, Tab 정지·메인 시간·미니게임 교체·전체 재시작 |
 
 관련 기능을 수정한 경우 다음을 확인한다.

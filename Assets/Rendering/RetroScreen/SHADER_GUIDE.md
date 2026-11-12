@@ -171,12 +171,23 @@ public class ExampleScreenControl : MonoBehaviour
 | 반사 밝기 | 같은 창 → Environment Reflections → `Intensity Multiplier` | 0.3 |
 | 달빛(창문 그림자) | `Base/Directional Light` | 푸른빛 (0.55, 0.65, 1), Intensity 1.6, 회전 (14, 100, 0), Soft Shadows |
 | 게임기 화면 빛 | `Base/MiniGameScreenLight` (Point Light + **Mini Game Screen Glow**) | 아래 표 |
+| 창밖 밤 풍경 | `Map/NightView` (창마다 `_Sky`·`_Trees` 배경판, Unlit) | 아래 "창밖 밤 풍경" |
 
 - **그림자를 더 진하게** 하려면 Environment Lighting 세 색을 더 어둡게 한다. 그림자 속은 이 색으로만 밝혀진다.
   너무 어두우면 숨은 상태(Shift)에서 문·엄마가 잘 안 보이므로 실제 화면에서 확인한다.
 - **달빛 위치**는 Directional Light의 회전으로 옮긴다. 지금은 침대 뒤쪽(서쪽) 창으로 들어와 옷장·책장에 창틀 모양 빛을 만든다.
   X(첫 값)를 키우면 바닥 쪽으로, Y를 바꾸면 좌우로 움직인다.
 - 천장 조명(`Map/Light_Ceiling6`)은 Baked 모드인데 라이트맵이 없어서 화면에 영향이 없다(밤이라 꺼진 상태로 둠).
+
+### 창밖 밤 풍경
+
+두 창(`Map/wallWindowSlide`, `Map/wallWindowSlide (1)`) 너머에 배경판을 두 장씩 세웠다. 조명을 받지 않는 Unlit이고 그림자를 드리우지 않아 달빛 그림자를 가리지 않는다.
+
+- `<창>_Sky`(35m 거리): 별이 있는 남색 하늘, 지평선의 도시 불빛 번짐, 먼 산 능선, 창 일부에 불이 켜진 아파트 실루엣. 텍스처는 `Assets/_Art/Textures/NightView/T_NightSky_<창>.png`.
+- `<창>_Trees`(14m 거리): 나무·전봇대·전선 실루엣(알파 컷아웃). 침대에서 올려다보는 각도라 지금 구도에서는 전선 정도만 보인다.
+- 침대에서 보면 창이 눈높이보다 위에 있어 창으로는 주로 하늘이 보이고, 아파트 지붕과 불빛은 창 아래쪽에 걸친다. 달은 달빛이 오는 서쪽에 그리므로 두 창 모두 화면 밖이며, 그쪽 하늘이 조금 밝다.
+- 유리(반투명, 알파 0.5)가 배경을 절반쯤 어둡게 하므로 텍스처를 실제보다 밝게 그렸다. 더 어둡게·밝게 하려면 `Assets/_Art/Materials/NightView/M_NightSky_<창>.mat`의 Base Color를 조절한다(흰색이 원래 밝기).
+- 다시 만들기: `Tools > Art > Build Night Window Views (Active Scene)`(`Assets/_Art/Editor/NightViewBuilder.cs`). 카메라 위치나 창 위치·크기를 바꾸면 다시 실행한다. 창 너머 시야가 배경판 범위를 벗어나면 Console에 경고가 나온다. 엄마 창문 등장 지점(창밖 약 2m)보다 훨씬 멀리 있어 등장 연출을 가리지 않는다.
 
 ### 게임기 화면 빛 (Mini Game Screen Glow)
 
@@ -188,6 +199,7 @@ public class ExampleScreenControl : MonoBehaviour
 | `Max Intensity` | 화면이 가장 밝을 때 빛 세기(기본 2). 방이 너무 밝으면 줄인다 |
 | `Min Brightness` | 검은 배경 게임도 최소한 이 비율만큼 빛난다(기본 0.35) |
 | `Hidden Intensity Multiplier` | Shift로 숨겼을 때 남길 빛(기본 0 = 완전히 꺼짐). 0.1~0.2면 이불 속 화면이 새어 나오는 느낌 |
+| `Snap Off When Hidden` | 켜면(기본) 숨기는 순간 빛이 바로 꺼진다. 끄면 `Fade Speed`로 서서히 줄어든다. 다시 꺼낼 때는 항상 서서히 켜진다 |
 | `Follow Screen Color` / `Color Saturation` | 화면 색 따라가기 켜기·끄기 / 0이면 흰빛, 1이면 화면 색 그대로 |
 | `Fallback Color` | 색을 따라가지 않을 때(또는 첫 샘플 전) 빛 색 |
 | `Sample Interval` / `Fade Speed` | 색을 읽는 간격 / 바뀌는 속도. Fade Speed가 크면 깜빡이듯 빠르게 바뀐다 |

@@ -11,8 +11,12 @@ namespace GE.Art.Editor
     /// <summary>
     /// 침대에 누운 주인공(1인칭 시점에서 보이는 몸)을 코드로 생성하는 Editor 전용 도구.
     /// - Blanket: 몸 형태(가슴·배·두 다리·발끝)대로 볼록하게 덮인 이불. 침대 커버(bedSingle.fbx의 carpet)와 같은 머티리얼을 쓴다.
-    /// - Body: 이불 밖으로 나온 상체와 팔. 파자마(민트 바탕에 빨강 삼각형·노랑 사각형·초록 원) 텍스처와 피부 머티리얼을 쓴다.
+    /// - Body: 이불 밖으로 나온 상체. 파자마(민트 바탕에 빨강 삼각형·노랑 사각형·초록 원) 텍스처를 쓴다.
+    /// - Arms: 배 위에 올려 둔 쉬는 팔. 게임기를 숨겼을 때(Shift)만 보인다.
+    /// - HandheldConsoleRig 프리팹: 게임기(HandheldConsole)와 그것을 쥔 손. Main Camera 자식으로 두고 HandheldConsoleView가
+    ///   게임기 화면을 미니게임 viewport에 맞추며, 게임기를 보이는 동안에는 PlayerInBed/Arms를 끈다.
     /// 메시·텍스처는 실행할 때마다 다시 만들지만, 머티리얼과 프리팹은 이미 있으면 덮어쓰지 않는다(Inspector 조정값 보존).
+    /// 단, 기존 PlayerInBed 프리팹에 Arms 자식이 없으면 추가한다.
     /// 프리팹 조립은 프리뷰 씬에서 하므로 Build 메뉴는 열린 씬을 수정하지 않는다. 씬 배치는 Place 메뉴로 따로 한다.
     /// </summary>
     public static class PlayerInBedBuilder
@@ -22,6 +26,10 @@ namespace GE.Art.Editor
         private const string PajamaTexturePath = "Assets/_Art/Textures/Pajama/T_Pajama_Pattern.png";
         private const string MaterialDir = "Assets/_Art/Materials/Player";
         private const string PrefabPath = "Assets/_Art/Prefabs/PlayerInBed.prefab";
+        private const string ConsolePrefabPath = "Assets/_Art/Prefabs/HandheldConsole.prefab";
+        private const string RigPrefabPath = "Assets/_Art/Prefabs/HandheldConsoleRig.prefab";
+        private const string RigInstanceName = "HandheldConsoleRig";
+        private const string ArmsChildName = "Arms";
         private const string LitShaderName = "Universal Render Pipeline/Lit";
         private const string InstanceName = "PlayerInBed";
 
@@ -49,18 +57,165 @@ namespace GE.Art.Editor
 
             var blanketHeights = new BlanketHeightField();
             Mesh blanketMesh = SaveMesh("PlayerInBed_Blanket", BuildBlanketMesh(blanketHeights));
-            Mesh bodyMesh = SaveMesh("PlayerInBed_Body", BuildBodyMesh(blanketHeights));
+            Mesh bodyMesh = SaveMesh("PlayerInBed_Body", BuildBodyMesh());
+            Mesh armsMesh = SaveMesh("PlayerInBed_Arms", BuildRestingArmsMesh(blanketHeights));
+            Mesh handsMesh = SaveMesh("PlayerInBed_ConsoleHands", BuildConsoleHandsMesh());
             AssetDatabase.SaveAssets();
 
-            if (File.Exists(PrefabPath)) return;
-            BuildPrefabInPreviewScene(scene =>
+            if (File.Exists(PrefabPath))
             {
-                var root = new GameObject(InstanceName);
+                EnsureArmsChild(armsMesh, pajama, skin);
+            }
+            else
+            {
+                BuildPrefabInPreviewScene(PrefabPath, scene =>
+                {
+                    var root = new GameObject(InstanceName);
+                    SceneManager.MoveGameObjectToScene(root, scene);
+                    AddRenderer(root.transform, "Blanket", blanketMesh, blanketMain, blanketFold);
+                    AddRenderer(root.transform, "Body", bodyMesh, pajama, skin);
+                    AddRenderer(root.transform, ArmsChildName, armsMesh, pajama, skin);
+                    return root;
+                });
+            }
+
+            BuildConsoleRigPrefab(handsMesh, skin);
+            EnsureLiveScreenMaterial();
+        }
+
+        /// <summary>
+        /// 게임기가 움직이는 동안 미니게임 화면을 게임기 화면에 그릴 URP Unlit 머티리얼을 만들고 리그 프리팹에 연결한다.
+        /// 텍스처(RenderTexture)는 실행 중에 HandheldConsoleView가 붙이므로 머티리얼에는 비워 둔다.
+        /// 이미 연결돼 있으면(Inspector에서 바꾼 경우 포함) 그대로 둔다.
+        /// </summary>
+        private static void EnsureLiveScreenMaterial()
+        {
+            const string path = "Assets/_Art/Materials/HandheldConsole/M_Console_ScreenLive.mat";
+            Material material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                Shader unlit = Shader.Find("Universal Render Pipeline/Unlit");
+                if (unlit == null) throw new System.InvalidOperationException("URP Unlit 셰이더를 찾을 수 없습니다.");
+                EnsureFolder(Path.GetDirectoryName(path).Replace('\\', '/'));
+                material = new Material(unlit) { name = "M_Console_ScreenLive" };
+                material.SetColor("_BaseColor", Color.white);
+                AssetDatabase.CreateAsset(material, path);
+            }
+
+            GameObject contents = PrefabUtility.LoadPrefabContents(RigPrefabPath);
+            try
+            {
+                var serialized = new SerializedObject(contents.GetComponent<HandheldConsoleView>());
+                SerializedProperty property = serialized.FindProperty("liveScreenMaterial");
+                if (property.objectReferenceValue != null) return;
+                property.objectReferenceValue = material;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SaveAsPrefabAsset(contents, RigPrefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        /// <summary>
+        /// 팔을 Body에서 분리하기 전에 만든 PlayerInBed 프리팹에 Arms 자식을 추가한다.
+        /// 프리팹 원본만 수정하므로 씬의 PlayerInBed 인스턴스에도 자동으로 반영된다.
+        /// </summary>
+        private static void EnsureArmsChild(Mesh armsMesh, Material pajama, Material skin)
+        {
+            GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
+            try
+            {
+                if (contents.transform.Find(ArmsChildName) != null) return;
+                AddRenderer(contents.transform, ArmsChildName, armsMesh, pajama, skin);
+                PrefabUtility.SaveAsPrefabAsset(contents, PrefabPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        /// <summary>
+        /// HandheldConsoleRig 프리팹: 루트(HandheldConsoleView) / HandheldConsole(중첩 프리팹) / Hands.
+        /// 리그는 화면 앞에 크게 확대되어 놓이므로 방에 그림자를 드리우지 않게 모든 렌더러의 그림자를 끈다.
+        /// 매니저·카메라·쉬는 팔 참조는 씬마다 다르므로 Place 메뉴에서 연결한다.
+        /// </summary>
+        private static void BuildConsoleRigPrefab(Mesh handsMesh, Material skin)
+        {
+            if (File.Exists(RigPrefabPath)) return;
+            var consolePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ConsolePrefabPath);
+            if (consolePrefab == null) throw new FileNotFoundException($"게임기 프리팹이 없습니다: {ConsolePrefabPath}");
+
+            BuildPrefabInPreviewScene(RigPrefabPath, scene =>
+            {
+                var root = new GameObject(RigInstanceName);
                 SceneManager.MoveGameObjectToScene(root, scene);
-                AddRenderer(root.transform, "Blanket", blanketMesh, blanketMain, blanketFold);
-                AddRenderer(root.transform, "Body", bodyMesh, pajama, skin);
+                var console = (GameObject)PrefabUtility.InstantiatePrefab(consolePrefab, scene);
+                console.transform.SetParent(root.transform, false);
+                AddRenderer(root.transform, "Hands", handsMesh, skin);
+
+                foreach (Renderer rigRenderer in root.GetComponentsInChildren<Renderer>(true))
+                {
+                    rigRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+
+                Renderer screen = console.GetComponentsInChildren<Renderer>(true).FirstOrDefault(r => r.name == "Screen");
+                if (screen == null) throw new System.InvalidOperationException("게임기 프리팹에서 Screen 렌더러를 찾을 수 없습니다.");
+                var view = root.AddComponent<HandheldConsoleView>();
+                var serialized = new SerializedObject(view);
+                serialized.FindProperty("screenRenderer").objectReferenceValue = screen;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
                 return root;
             });
+        }
+
+        /// <summary>
+        /// 활성 씬의 Base/Main Camera 아래에 게임기 리그를 놓고 매니저·카메라·쉬는 팔(PlayerInBed/Arms)을 연결한다.
+        /// 이미 있으면 참조만 다시 연결한다. 위치·크기는 HandheldConsoleView가 viewport에 맞춰 계산한다.
+        /// 씬은 Dirty로만 표시하고 저장하지 않는다.
+        /// </summary>
+        [MenuItem("Tools/Art/Place Handheld Console Rig (Active Scene)")]
+        public static string PlaceConsoleRigInActiveScene()
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            Camera mainCamera = scene.GetRootGameObjects()
+                .SelectMany(go => go.GetComponentsInChildren<Camera>(true))
+                .FirstOrDefault(c => c.name == "Main Camera");
+            if (mainCamera == null) throw new System.InvalidOperationException("활성 씬에서 Main Camera를 찾을 수 없습니다.");
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(RigPrefabPath);
+            if (prefab == null) throw new FileNotFoundException($"리그 프리팹이 없습니다. 먼저 Build Player In Bed를 실행하세요: {RigPrefabPath}");
+
+            MiniGameManager manager = scene.GetRootGameObjects()
+                .SelectMany(go => go.GetComponentsInChildren<MiniGameManager>(true)).FirstOrDefault();
+            Transform arms = scene.GetRootGameObjects()
+                .SelectMany(go => go.GetComponentsInChildren<Transform>(true))
+                .FirstOrDefault(t => t.name == ArmsChildName && t.parent != null && t.parent.name == InstanceName);
+
+            Transform existing = mainCamera.transform.Find(RigInstanceName);
+            GameObject rig;
+            if (existing != null)
+            {
+                rig = existing.gameObject;
+            }
+            else
+            {
+                rig = (GameObject)PrefabUtility.InstantiatePrefab(prefab, mainCamera.transform);
+                Undo.RegisterCreatedObjectUndo(rig, "Place Handheld Console Rig");
+                rig.name = RigInstanceName;
+            }
+
+            var view = rig.GetComponent<HandheldConsoleView>();
+            var serialized = new SerializedObject(view);
+            serialized.FindProperty("miniGameManager").objectReferenceValue = manager;
+            serialized.FindProperty("targetCamera").objectReferenceValue = mainCamera;
+            serialized.FindProperty("restingArms").objectReferenceValue = arms != null ? arms.gameObject : null;
+            serialized.ApplyModifiedProperties();
+            // 저장되는 기본 배치도 현재 Game 뷰 비율 기준으로 맞춰 둔다(플레이 중에는 매 프레임 다시 맞춘다).
+            view.FitNow();
+            EditorSceneManager.MarkSceneDirty(scene);
+            return $"{RigInstanceName} under {mainCamera.name}; manager={(manager != null)}, restingArms={(arms != null)}";
         }
 
         /// <summary>
@@ -273,11 +428,21 @@ namespace GE.Art.Editor
 
         // ---------------- 몸(파자마 상체·팔) ----------------
 
-        private static MeshData BuildBodyMesh(BlanketHeightField field)
+        // 상체만 담는다. 서브메시 수는 기존 Body 렌더러의 머티리얼 2개(파자마, 피부)와 맞춰 둔다.
+        private static MeshData BuildBodyMesh()
         {
             var data = new MeshData(2);
             AddTorso(data);
+            return data;
+        }
 
+        /// <summary>
+        /// 배 위에 올려 둔 쉬는 팔(소매·팔·손). 게임기를 숨겼을 때만 보이도록 Body와 분리한 별도 메시다.
+        /// 게임기를 들고 있을 때는 HandheldConsoleView가 이 팔(PlayerInBed/Arms)을 끄고 게임기를 쥔 손을 보여 준다.
+        /// </summary>
+        private static MeshData BuildRestingArmsMesh(BlanketHeightField field)
+        {
+            var data = new MeshData(2);
             for (int side = -1; side <= 1; side += 2)
             {
                 // 어깨 → 팔꿈치(이불 위, 몸 옆) → 손목(배 위). 높이는 이불 윗면에 팔 반지름을 더해 얹는다.
@@ -296,6 +461,44 @@ namespace GE.Art.Editor
                 var handCenter = wrist + forward * 0.075f;
                 handCenter.y = field.SurfaceY(handCenter.z, handCenter.x) + 0.03f;
                 AddEllipsoid(data, 1, handCenter, Quaternion.LookRotation(forward, Vector3.up), new Vector3(0.058f, 0.032f, 0.085f));
+            }
+            return data;
+        }
+
+        // ---------------- 게임기를 쥔 손 ----------------
+
+        /// <summary>
+        /// 게임기 리그(HandheldConsoleRig) 로컬 좌표의 두 손. 단위는 게임기 모델과 같은 실제 크기(m)이며,
+        /// 리그 전체가 화면 크기에 맞춰 확대되므로 손도 게임기와 같은 비율로 커진다.
+        /// 좌표: +X 오른쪽, +Y 위, -Z 카메라 쪽(게임기 화면이 -Z를 향함). 그립 중심 X ±0.118, 앞면 Z -0.010, 뒷면 볼록부 Z 약 0.032.
+        /// 70% viewport에서는 그립이 화면 좌우 밖에 있어 엄지 끝만 화면 가장자리에 걸친다. 팔뚝은 화면 아래로 빠져나간다.
+        /// </summary>
+        private static MeshData BuildConsoleHandsMesh()
+        {
+            var data = new MeshData(1);
+            for (int side = -1; side <= 1; side += 2)
+            {
+                // 그립 뒤를 감싼 손바닥과 바깥쪽을 감은 손가락.
+                AddEllipsoid(data, 0, new Vector3(side * 0.122f, -0.014f, 0.040f), Quaternion.identity, new Vector3(0.040f, 0.058f, 0.016f));
+                AddEllipsoid(data, 0, new Vector3(side * 0.158f, -0.012f, 0.012f), Quaternion.identity, new Vector3(0.016f, 0.052f, 0.026f));
+
+                // 엄지: 손바닥 옆에서 그립 앞면으로 넘어와 아래쪽 스틱·버튼 근처에 놓인다.
+                var thumbPath = CatmullRom(new[]
+                {
+                    new Vector3(side * 0.150f, -0.040f, 0.012f),
+                    new Vector3(side * 0.128f, -0.028f, -0.016f),
+                    new Vector3(side * 0.096f, -0.018f, -0.020f),
+                }, 12);
+                AddTube(data, 0, thumbPath, t => Mathf.Lerp(0.012f, 0.0095f, t), 10, 1f);
+
+                // 손목·팔뚝: 그립 아래에서 화면 아래 바깥(카메라 쪽)으로 빠져나간다.
+                var forearmPath = CatmullRom(new[]
+                {
+                    new Vector3(side * 0.135f, -0.050f, 0.042f),
+                    new Vector3(side * 0.170f, -0.160f, 0.020f),
+                    new Vector3(side * 0.220f, -0.320f, -0.060f),
+                }, 16);
+                AddTube(data, 0, forearmPath, t => Mathf.Lerp(0.030f, 0.036f, t), 12, 1f);
             }
             return data;
         }
@@ -651,15 +854,15 @@ namespace GE.Art.Editor
         }
 
         /// <summary>열린 씬을 건드리지 않도록 프리뷰 씬에서 프리팹을 조립·저장한다.</summary>
-        private static void BuildPrefabInPreviewScene(System.Func<Scene, GameObject> build)
+        private static void BuildPrefabInPreviewScene(string prefabPath, System.Func<Scene, GameObject> build)
         {
-            EnsureFolder(Path.GetDirectoryName(PrefabPath).Replace('\\', '/'));
+            EnsureFolder(Path.GetDirectoryName(prefabPath).Replace('\\', '/'));
             Scene preview = EditorSceneManager.NewPreviewScene();
             try
             {
                 GameObject root = build(preview);
-                PrefabUtility.SaveAsPrefabAsset(root, PrefabPath, out bool success);
-                if (!success) Debug.LogError($"[PlayerInBedBuilder] 프리팹 저장 실패: {PrefabPath}");
+                PrefabUtility.SaveAsPrefabAsset(root, prefabPath, out bool success);
+                if (!success) Debug.LogError($"[PlayerInBedBuilder] 프리팹 저장 실패: {prefabPath}");
             }
             finally
             {
