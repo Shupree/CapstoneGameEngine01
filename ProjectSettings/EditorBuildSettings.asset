@@ -38,6 +38,33 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/MiniGame09.unity
     guid: 170da58177426874abd11db30ddc5ce6
+  - enabled: 1
+    path: Assets/Scenes/MiniGame10.unity
+    guid: 45f834a8796a4cf19839afe7efed8026
+  - enabled: 1
+    path: Assets/Scenes/MiniGame11.unity
+    guid: 265b4ff26415492d96ee51730c9108d2
+  - enabled: 1
+    path: Assets/Scenes/MiniGame12.unity
+    guid: 3af3b652bc3d4428b1213edc6cd7b178
+  - enabled: 1
+    path: Assets/Scenes/MiniGame13.unity
+    guid: 92599970031549798dd3648c47af5554
+  - enabled: 1
+    path: Assets/Scenes/MiniGame14.unity
+    guid: 989138203c3942ff8d8e5d1ce4a0799e
+  - enabled: 1
+    path: Assets/Scenes/MiniGame15.unity
+    guid: d2a86b53d8c2411486e38a69cbe02bbf
+  - enabled: 1
+    path: Assets/Scenes/MiniGame16.unity
+    guid: da86d63183714c29b84b2515363e4845
+  - enabled: 1
+    path: Assets/Scenes/MiniGame17.unity
+    guid: fd39258a84504abc81bd25d4c00502b1
+  - enabled: 1
+    path: Assets/Scenes/MiniGame18.unity
+    guid: 45e4f1a01e2e45a5ab58ded9e87fb8a2
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

@@ -5145,6 +5145,15 @@ MonoBehaviour:
   - MiniGame07
   - MiniGame08
   - MiniGame09
+  - MiniGame10
+  - MiniGame11
+  - MiniGame12
+  - MiniGame13
+  - MiniGame14
+  - MiniGame15
+  - MiniGame16
+  - MiniGame17
+  - MiniGame18
   totalMiniGamesToClear: 18
   currentClearedCount: 0
   startingLives: 3
