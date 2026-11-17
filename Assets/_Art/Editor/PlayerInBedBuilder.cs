@@ -829,11 +829,16 @@ namespace GE.Art.Editor
         }
 
         /// <summary>
-        /// 이불 색을 침대 커버와 똑같이 맞추려고 bedSingle.fbx의 cover 렌더러가 쓰는 머티리얼(carpet, carpetWhite)을 그대로 참조한다.
-        /// FBX 리맵으로 커버 머티리얼을 바꾸면 이불도 같이 바뀐다.
+        /// 이불을 침대 커버와 같은 머티리얼로 맞춘다. 방 디테일 머티리얼(M_BedBlanket·M_BedSheet)이 있으면 그것을,
+        /// 없으면 bedSingle.fbx의 cover 렌더러가 쓰는 내장 머티리얼(carpet, carpetWhite)을 참조한다.
         /// </summary>
         private static void GetBedCoverMaterials(out Material main, out Material fold)
         {
+            // 방 디테일 머티리얼(RoomMaterialBuilder)로 침대 커버를 바꿨다면 이불도 같은 것을 쓴다.
+            main = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Art/Materials/Room/M_BedBlanket.mat");
+            fold = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Art/Materials/Room/M_BedSheet.mat");
+            if (main != null && fold != null) return;
+
             var bed = AssetDatabase.LoadAssetAtPath<GameObject>(BedFbx);
             Renderer cover = bed != null ? bed.GetComponentsInChildren<Renderer>(true).FirstOrDefault(r => r.name == "cover") : null;
             Material[] materials = cover != null ? cover.sharedMaterials : new Material[0];

@@ -207,6 +207,7 @@ MainGame
 - 새 미니게임 카메라가 `Camera.main` 선택을 방해하지 않도록 태그를 확인한다. 카메라·Canvas·조명·오디오 등 Additive 씬 간 간섭을 함께 확인한다.
 - `Base/Main Camera`의 시선은 `MainGameCameraLookController`가 담당한다. 위치·상하 각도·기울기·FOV·미니게임 카메라는 유지하며 Y축만 회전한다. Inspector의 `Left Yaw Offset`(음수, 책상)과 `Right Yaw Offset`(양수, 창문)으로 한계를 조절한다. `Rotation Speed Degrees Per Second`는 좌우 공통 각속도이며 기존 책상 속도인 약 66.89도/초를 기준으로 한다. 양끝까지 같은 시간을 쓰는 정규화 이동으로 되돌리면 좌우 속도가 달라지므로 실제 각도를 초당 일정하게 이동한다. 마우스 드래그는 화면을 끌어당기는 방향으로 회전하며 화살표 각속도의 1.5배를 적용한다. 화면 재표시·미니게임 교체는 마지막 시선을 유지하고 전체 Retry에서만 최초 구도로 돌아온다.
 - Shift로 미니게임을 숨겼을 때 방 화면에서 시작한 마우스 왼쪽 드래그도 방향키와 같은 각속도 및 좌우 한계를 쓴다. 가로 델타는 방향 판정에 쓰고, UI에서 시작한 입력은 카메라 드래그에서 제외한다.
+- 방 소품의 단색 placeholder(천장 URP 기본 Lit, 침대 커버·매트리스·베개, 의자, 키보드·마우스·모니터 테두리, 천장등, 벽 바깥면)는 `Assets/_Art/Materials/Room/`의 머티리얼로 씬 렌더러에 직접 지정했다(`Tools > Art > Build And Apply Room Detail Materials`). FBX 임포터 리맵으로 바꾸지 않는다. 다른 오브젝트가 다른 FBX의 내장 머티리얼을 직접 참조하고 있어 리맵하면 그 참조가 누락(분홍)된다. 모니터 화면 슬롯(1번, 컴퓨터 등장 이벤트가 교체), 유리, 문·옷장 손잡이는 그대로 둔다.
 - 창밖 풍경은 `Map/NightView`의 Unlit 배경판(그림자 끔)이다. 카메라나 창의 위치를 옮기면 `Tools > Art > Build Night Window Views (Active Scene)`를 다시 실행한다. 조절 방법은 [셰이더 가이드 9장](Assets/Rendering/RetroScreen/SHADER_GUIDE.md)을 따른다.
 - 씬 구성 도구를 실행하기 전에 기존 씬의 저장 상태를 확인한다. 기존 씬을 파괴하고 다시 만들어 UI 문제를 해결하지 않는다.
 
