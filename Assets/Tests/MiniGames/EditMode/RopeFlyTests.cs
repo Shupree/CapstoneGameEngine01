@@ -30,7 +30,9 @@ namespace GE.MiniGames.Tests
             var angle = new RopeModel(1); Set(angle, "Angle", 49d); angle.Step(1.0 / 60, 0);
             Assert.That(angle.Result, Is.EqualTo(RopeStep.Tilted));
             var ball = new RopeModel(1); Set(ball, "BallPosition", 101d); ball.Step(1.0 / 60, 0);
-            Assert.That(ball.Result, Is.EqualTo(RopeStep.BallDropped));
+            // 판 끝을 넘은 즉시 종료하지 않고 낙하가 끝난 뒤 실패합니다.
+            Assert.That(ball.Falling, Is.True); Assert.That(ball.Result, Is.EqualTo(RopeStep.Running));
+            ball.Step(1, 0); Assert.That(ball.Result, Is.EqualTo(RopeStep.BallDropped));
             double position = ball.BallPosition; ball.Step(10, -1); Assert.That(ball.BallPosition, Is.EqualTo(position));
         }
         [Test]

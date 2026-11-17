@@ -130,7 +130,7 @@ namespace GE.MiniGames.Tests
                 Assert.That(game.Progress, Is.Zero);
                 Assert.That(game.Model.Current, Is.EqualTo(current));
                 game.ProcessFrame(0, GameButtons.None);
-                game.ProcessFrame(0, key);
+                game.ProcessFrame(0, key); FinishMotion(game);
                 Assert.That(game.Progress, Is.EqualTo(1));
             }
             finally { Object.DestroyImmediate(owner); }
@@ -147,9 +147,9 @@ namespace GE.MiniGames.Tests
                 game.Completed += result => results++;
                 game.StartGame(); game.ProcessFrame(0, GameButtons.None);
                 for (int i = 0; i < 4; i++)
-                { game.ProcessFrame(0, KeyFor(game.Model.Current)); game.ProcessFrame(0, GameButtons.None); }
+                { game.ProcessFrame(0, KeyFor(game.Model.Current)); FinishMotion(game); game.ProcessFrame(0, GameButtons.None); }
                 var wrong = KeyFor(game.Model.Current) == GameButtons.A ? GameButtons.D : GameButtons.A;
-                game.ProcessFrame(0, wrong);
+                game.ProcessFrame(0, wrong); FinishMotion(game);
                 Assert.That(game.State, Is.EqualTo(MiniGameState.Failed));
                 for (int i = 0; i < 5; i++) game.ProcessFrame(0, wrong);
                 Assert.That(results, Is.EqualTo(1));
@@ -158,7 +158,7 @@ namespace GE.MiniGames.Tests
                 Assert.That(game.Model.Remaining, Is.EqualTo(30));
                 Assert.That(game.RunId, Is.EqualTo(2));
                 for (int i = 0; i < 30; i++)
-                { game.ProcessFrame(0, KeyFor(game.Model.Current)); game.ProcessFrame(0, GameButtons.None); }
+                { game.ProcessFrame(0, KeyFor(game.Model.Current)); FinishMotion(game); game.ProcessFrame(0, GameButtons.None); }
                 Assert.That(game.State, Is.EqualTo(MiniGameState.Succeeded));
                 Assert.That(results, Is.EqualTo(2));
                 game.StopGame();
@@ -167,6 +167,9 @@ namespace GE.MiniGames.Tests
             }
             finally { Object.DestroyImmediate(owner); }
         }
+
+        // 모델 판정은 0.18초 이동 후 이루어집니다. 같은 키 유지로 다음 물건이 소비되지 않아야 합니다.
+        private static void FinishMotion(SortingGame game) { game.ProcessFrame(.1f, GameButtons.None); game.ProcessFrame(.1f, GameButtons.None); }
 
         private static GameButtons KeyFor(SortingItem item)
         {

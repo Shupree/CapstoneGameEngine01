@@ -37,6 +37,8 @@ namespace GE.MiniGames.PlayModeTests
         {
             InputSystem.QueueStateEvent(keyboard, new KeyboardState(keys));
             yield return null; yield return null;
+            // 분류 입력은 0.18초 이동이 끝나야 소비되므로 기존 결과 검사는 이동 종료 후 수행합니다.
+            yield return new WaitForSeconds(.2f);
         }
         private IEnumerator Load()
         {

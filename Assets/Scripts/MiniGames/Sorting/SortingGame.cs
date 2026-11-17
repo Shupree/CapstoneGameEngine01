@@ -10,6 +10,10 @@ namespace GE.MiniGames.Sorting
         [Tooltip("-1: 매 시도 무작위 / 0 이상: 테스트용 고정 출현 순서")]
         [SerializeField] private int randomSeed = -1;
         public SortingModel Model { get; private set; }
+        private bool sorting;
+        private float sortTime;
+        public SortingChoice MovingChoice { get; private set; }
+        public float SortProgress => sorting ? Mathf.Clamp01(sortTime / .18f) : 0f;
         public override string GameId => "MiniGame03";
         public override int Progress => Model?.Correct ?? 0;
         public override int Target => Model?.Target ?? Mathf.Max(1, targetCount);
@@ -21,6 +25,7 @@ namespace GE.MiniGames.Sorting
         protected override void OnResetGame()
         {
             Model = new SortingModel(Mathf.Max(1, targetCount), randomSeed < 0 ? (int?)null : randomSeed);
+            sorting = false; sortTime = 0;
         }
 
         internal override void OnGameInput(GameButtons pressed)
@@ -36,13 +41,21 @@ namespace GE.MiniGames.Sorting
                 return;
             }
 #endif
+            if (sorting) return;
             var choices = pressed & (GameButtons.A | GameButtons.D | GameButtons.Space);
             if (choices == GameButtons.None) return;
             // 여러 분류 키를 동시에 누르면 무시합니다. 세 키를 함께 눌러 정답을 자동 선택하는 편법을 막습니다.
             if (choices != GameButtons.A && choices != GameButtons.D && choices != GameButtons.Space) return;
             SortingChoice choice = choices == GameButtons.A ? SortingChoice.Left
                 : choices == GameButtons.D ? SortingChoice.Right : SortingChoice.Discard;
-            var result = Model.Submit(choice);
+            // 오답도 입력한 방향으로 이동시킨 뒤 판정합니다. 이동 중에는 다음 물건 입력을 받지 않습니다.
+            MovingChoice = choice; sortTime = 0; sorting = true;
+        }
+
+        private void CompleteSort()
+        {
+            sorting = false;
+            var result = Model.Submit(MovingChoice);
             if (result == SortingStep.Success)
                 Finish(MiniGameOutcome.Success, $"{Target}개를 모두 정확하게 분류했습니다!");
             else if (result == SortingStep.Wrong)
@@ -51,9 +64,14 @@ namespace GE.MiniGames.Sorting
             else NotifyChanged();
         }
 
-        // 입력 시에만 모델이 바뀌므로 정지 중 시간 누적·생성·물리 처리가 없습니다.
-        protected override void OnGameTick(float deltaTime) { }
+        // 공통 Playing 틱으로 이동 시간을 관리해 정지·재개 때 위치와 예약 판정을 그대로 유지합니다.
+        protected override void OnGameTick(float deltaTime)
+        {
+            if (!sorting) return;
+            sortTime += deltaTime;
+            if (sortTime >= .18f) CompleteSort();
+        }
         protected override void OnClearInput() { }
-        protected override void OnStopGame() { Model = null; }
+        protected override void OnStopGame() { sorting = false; Model = null; }
     }
 }

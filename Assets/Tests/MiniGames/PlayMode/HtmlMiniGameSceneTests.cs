@@ -99,7 +99,8 @@ namespace GE.MiniGames.PlayModeTests
                     var attacks = (System.Collections.Generic.List<ZoneAttack>)typeof(SafeZoneModel).GetField("attacks", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(model);
                     var attack = new ZoneAttack(); Set(attack, "Bounds", new Rect(160, 0, 80, 300)); Set(attack, "Striking", true); attacks.Add(attack);
                 }
-                yield return new WaitForSeconds(.1f);
+                // 균형잡기는 낙하가 보인 뒤 실패하므로 낙하 종료까지 기다립니다.
+                yield return new WaitForSeconds(1f);
                 Assert.That(game.State, Is.EqualTo(MiniGameState.Failed)); Assert.That(results, Is.EqualTo(1)); Capture(game, "Failed");
                 yield return Keys(Key.R); Assert.That(game.State, Is.EqualTo(MiniGameState.Playing)); Assert.That(game.RunId, Is.EqualTo(2));
             }

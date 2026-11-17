@@ -81,6 +81,7 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
     private MiniGameController currentMiniGameController;
     private System.Action<MiniGameResult> currentResultHandler;
     private bool currentClearHandled;
+    private MiniGameController passSource;
 
     protected override void Awake()
     {
@@ -391,9 +392,26 @@ public class MiniGameManager : SingletonMono<MiniGameManager>
         if (source.gameObject.scene.name != currentLoadedMiniGame) return;
         if (result.GameId != source.GameId || result.RunId != source.RunId) return;
         if (result.Outcome == MiniGameOutcome.Success && source.State == MiniGameState.Succeeded)
-            OnMiniGameCleared();
+        {
+            // 그림 UI가 있는 씬은 PASS를 읽을 시간을 준 뒤 기존 클리어 경로로 한 번만 넘깁니다.
+            if (passSource == source) return;
+            if (source.GetComponent<MiniGameArtworkUI>() == null) OnMiniGameCleared();
+            else StartCoroutine(ShowPassThenContinue(source, result.RunId));
+        }
         else if (result.Outcome == MiniGameOutcome.Failure && source.State == MiniGameState.Failed)
             OnMiniGameFailed();
+    }
+
+    private IEnumerator ShowPassThenContinue(MiniGameController source, int runId)
+    {
+        passSource = source;
+        source.KeyboardInputEnabled = false;
+        yield return new WaitForSecondsRealtime(.8f);
+        if (passSource == source) passSource = null;
+        // 대기 중 개발자 씬 교체나 게임오버가 발생하면 오래된 성공으로 다음 게임을 열지 않습니다.
+        if (source != null && source == currentMiniGameController && source.RunId == runId &&
+            source.State == MiniGameState.Succeeded && !isGameOver && !isRestarting && !isLoading)
+            OnMiniGameCleared();
     }
 
     // 실패 결과의 공통 진입점입니다. 실행 번호로 중복 차감을 막고, 목숨이 남으면 같은 미니게임을 R로 재시도합니다.

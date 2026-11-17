@@ -10,6 +10,11 @@ namespace GE.MiniGames.Rope
         private readonly Random random;
         private double accumulator, velocity, wind, ballVelocity;
         private int ticks;
+        private double fallTime, fallVelocityX, fallVelocityY;
+        public bool Falling { get; private set; }
+        // 판 회전과 분리된 피벗 기준 좌표로 낙하를 보관합니다. 떨어진 뒤에는 조작으로 복귀하지 않습니다.
+        public double FallX { get; private set; }
+        public double FallY { get; private set; }
         public double Angle { get; private set; }
         public double BallPosition { get; private set; }
         public double TimeLeft => Math.Max(0, 5 - ticks / 60.0);
@@ -30,13 +35,29 @@ namespace GE.MiniGames.Rope
             while (accumulator + 1e-10 >= step && Result == RopeStep.Running)
             {
                 accumulator -= step;
+                if (Falling)
+                {
+                    fallTime += step;
+                    FallX += fallVelocityX * step;
+                    FallY += fallVelocityY * step - 260 * step * step;
+                    fallVelocityY -= 520 * step;
+                    // 최소 0.35초 낙하를 보여주고 공 전체가 아래 줄을 지나면 실패합니다. 낙하 중 성공 시간은 멈춥니다.
+                    if (fallTime >= .35 && FallY <= -42) Result = RopeStep.BallDropped;
+                    continue;
+                }
                 wind = random.NextDouble() < .03 ? (random.NextDouble() - .5) * 100 : wind * .88;
                 velocity = (velocity + (Angle + wind + Math.Sign(direction) * 55) * step) * .96;
                 Angle += velocity * step;
                 ballVelocity = (ballVelocity + Angle * 12 * step) * .98;
                 BallPosition += ballVelocity * step;
                 if (Math.Abs(Angle) >= 48) Result = RopeStep.Tilted;
-                else if (Math.Abs(BallPosition) > 100) Result = RopeStep.BallDropped;
+                else if (Math.Abs(BallPosition) > 100)
+                {
+                    Falling = true;
+                    double angle = Angle * Math.PI / 180, cos = Math.Cos(angle), sin = Math.Sin(angle);
+                    FallX = BallPosition * cos + 32 * sin; FallY = -BallPosition * sin + 32 * cos;
+                    fallVelocityX = ballVelocity * cos; fallVelocityY = -ballVelocity * sin;
+                }
                 else if (++ticks >= 300) Result = RopeStep.Success;
             }
         }

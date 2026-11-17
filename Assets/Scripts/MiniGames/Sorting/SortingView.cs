@@ -18,6 +18,8 @@ namespace GE.MiniGames.Sorting
         [SerializeField] private GameObject overlay;
         private bool previousStartKey, startKeyArmed;
         private int stateFrame;
+        private Vector2 itemOrigin;
+        private bool originSaved;
         // 기존 모델의 Box/Bottle/Stone/Leaf/Bolt 순서는 유지하고 씬의 새 장난감 이미지와 표시 이름만 대응합니다.
         private static readonly string[] ItemNames = { "곰 인형", "로봇", "오리", "닭", "파란 새" };
 
@@ -66,6 +68,12 @@ namespace GE.MiniGames.Sorting
         {
             if (game == null || currentItem == null) return;
             var model = game.Model;
+            // 원본 배치에서 선택 방향으로 이동합니다. 다음 물건·재시도는 같은 원위치에서 시작합니다.
+            if (!originSaved) { itemOrigin = currentItem.rectTransform.anchoredPosition; originSaved = true; }
+            Vector2 direction = game.MovingChoice == SortingChoice.Left ? Vector2.left
+                : game.MovingChoice == SortingChoice.Right ? Vector2.right : Vector2.down;
+            float motion = game.SortProgress;
+            currentItem.rectTransform.anchoredPosition = itemOrigin + direction * (300f * motion * motion);
             bool hasItem = model != null && model.Remaining > 0;
             currentItem.enabled = hasItem;
             itemName.text = hasItem ? ItemNames[(int)model.Current] : "완료";

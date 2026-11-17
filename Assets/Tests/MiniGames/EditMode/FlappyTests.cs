@@ -21,7 +21,7 @@ namespace GE.MiniGames.Tests
                 Assert.That(game.Model.Velocity, Is.LessThan(firstVelocity));
                 game.ProcessFrame(0f, GameButtons.None);
                 game.ProcessFrame(0f, GameButtons.Space);
-                Assert.That(game.Model.Velocity, Is.EqualTo(game.Model.Rules.flapSpeed));
+                Assert.That(game.Model.Velocity, Is.EqualTo(game.Model.Rules.FlapSpeed));
             }
             finally { Object.DestroyImmediate(owner); }
         }

@@ -11,10 +11,11 @@ namespace GE.MiniGames.FlappyBird
         public float gravity = 14f;
         public float flapSpeed = 4.8f;
         public float pipeSpeed = 2.8f;
-        // 하강을 빠르게 하는 중력과 전진을 표현하는 파이프 이동 속도를 30% 높입니다.
+        // 직전 밸런스 대비 중력 10% 감소, 전진 20% 증가, 상승력 15% 증가로 더 빠르고 가볍게 조작합니다.
         // 씬의 기준값은 유지하고 계산값만 사용하므로 재시도/OnValidate 때 배율이 누적되지 않습니다.
-        public float Gravity => gravity * 1.3f;
-        public float PipeSpeed => pipeSpeed * 1.3f;
+        public float Gravity => gravity * 1.3f * .9f;
+        public float PipeSpeed => pipeSpeed * 1.3f * 1.2f;
+        public float FlapSpeed => flapSpeed * 1.15f;
         public float pipeSpacing = 3.8f;
         // 씬에는 기존 기준 간격을 보관하고 생성 시에만 두 배를 적용합니다. 재시도/OnValidate에서 누적되지 않습니다.
         public float PipeSpacing => pipeSpacing * 2f;
@@ -82,11 +83,11 @@ namespace GE.MiniGames.FlappyBird
                 pipes.Add(new FlappyPipe { X = Rules.firstPipeX + i * Rules.PipeSpacing, GapY = gap,
                     LowerWidth = Rules.pipeWidth, UpperWidth = Rules.pipeWidth });
             }
-            Velocity = Rules.flapSpeed;
+            Velocity = Rules.FlapSpeed;
         }
 
         // 속도를 누적하지 않고 교체하므로 빠른 연타에서도 한 번의 상승력이 일정합니다.
-        public void Flap() { if (Result == FlappyStep.Running) Velocity = Rules.flapSpeed; }
+        public void Flap() { if (Result == FlappyStep.Running) Velocity = Rules.FlapSpeed; }
 
         public FlappyStep Step(float seconds)
         {
